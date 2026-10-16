@@ -13,12 +13,12 @@
 | 自动记账弹窗 | 已完成 | 优化信息层级和操作文案，保留并突出原有的账本切换、账户/分类核对、保存和忽略能力。 |
 | 主题一致性 | 已完成 | Flutter 界面使用当前主题的 `colorScheme`，Android 悬浮弹窗沿用软件原有青绿色，不引入独立品牌色。 |
 | 回归验证 | 已完成 | 相关 Flutter 静态分析、2 项手动记账回归测试、13 项自动记账确认测试和 Android Debug 构建均通过。 |
-| GitHub 源码上传 | 待完成 | 完整源码已在本地提交，仍需完成 GitHub 浏览器授权后推送到 `wannenqingnian/KnowAccounts`。 |
+| GitHub 源码上传 | 已完成 | 完整源码及本次状态文档已推送到 `wannenqingnian/KnowAccounts` 的 `main` 分支。 |
 | 真机与发布验收 | 待完成 | 尚未进行不同屏幕、系统大字体、悬浮窗权限和真实支付页面的真机验收；本次未生成正式签名 Release。 |
 
 ## 安装包下载
 
-历史版本提供过 ARM64 Release 测试包，支持 Android 7.0 及以上。当前 `0.29.6` 源码已通过 Android Debug 构建，但尚未生成正式签名 Release，也未完成真机安装验证。GitHub 源码推送仍在等待账号浏览器授权，目前没有对应的 GitHub Release。
+历史版本提供过 ARM64 Release 测试包，支持 Android 7.0 及以上。当前 `0.29.6` 源码已通过 Android Debug 构建并推送到 GitHub，但尚未生成正式签名 Release，也未完成真机安装验证，目前没有对应的 GitHub Release。
 
 ## 已实现
 
