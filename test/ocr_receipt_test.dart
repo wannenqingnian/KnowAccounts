@@ -345,6 +345,16 @@ void main() {
     expect(d.occurredDate, DateTime(2026, 10, 3, 15, 4));
   });
   test(
+    'payment recipient becomes merchant and payment source selects account',
+    () {
+      final d = receiptDraft(
+        '支付成功\n实付金额 28.00元\n付款给 海底捞火锅\n付款来源 招商银行尾号1234\n支付时间 2026-10-16 12:30',
+      );
+      expect(d.merchant, '海底捞火锅');
+      expect(d.accountId, 'cmb1');
+    },
+  );
+  test(
     'redacted order identifier above its label is not a funding card tail',
     () {
       final d = receiptDraft(

@@ -36,7 +36,7 @@ object PaymentOverlay {
     private var note: EditText? = null
     private var tags: EditText? = null
     private var date: EditText? = null
-    private var type: Spinner? = null
+    private var selectedTypePosition = 0
     private var ledger: Spinner? = null
     private var account: Spinner? = null
     private var target: Spinner? = null
@@ -106,7 +106,7 @@ object PaymentOverlay {
     private fun values(): JSONObject? {
         val item=current() ?: return null
         if(collapsed || amount==null) return item.optJSONObject("edits")
-        val selectedType=listOf("", "expense", "income", "transfer", "refund").getOrElse(type?.selectedItemPosition ?: 0){""}
+        val selectedType=listOf("", "expense", "income", "transfer", "refund").getOrElse(selectedTypePosition){""}
         val selectedCategory=categoryChoices.getOrNull(category?.selectedItemPosition ?: -1)
         return JSONObject().put("draftId",item.optString("draftId")).put("ledgerId",selected(ledger,ledgerChoices))
             .put("amount",amount?.text?.toString() ?: "").put("merchant",merchant?.text?.toString() ?: "").put("note",note?.text?.toString() ?: "")
@@ -157,10 +157,14 @@ object PaymentOverlay {
             root.addView(scroller,LinearLayout.LayoutParams(-1,0,1f))
             if(item.optBoolean("duplicate")) content.addView(text("疑似重复 · ${item.optString("duplicateEvidence","已有多项字段或订单号与现有账目相符")}",13f).apply{setTypeface(typeface,Typeface.BOLD);setTextColor(Color.rgb(166,74,36));setPadding(dp(12),dp(10),dp(12),dp(10));background=background(Color.rgb(255,235,220),12)})
             if(item.optString("warning").isNotEmpty()) content.addView(text("请核对 · ${item.optString("warning")}",12f).apply{setTextColor(Color.rgb(166,91,36));setPadding(dp(12),dp(9),dp(12),dp(9));background=background(Color.rgb(255,245,230),12)})
-            content.addView(text("收支与金额",13f).apply{setTypeface(typeface,Typeface.BOLD);setPadding(dp(4),dp(14),dp(4),dp(6))})
-            type=spinner(listOf("请选择收支方向", "支出（转给他人/消费）", "收入（收款/领取红包）", "内部转账（自己的账户间）", "退款（关联原消费）"),when(edits?.optString("type") ?: if(item.optBoolean("peer")) "" else item.optString("type")){"expense"->1;"income"->2;"transfer"->3;"refund"->4;else->0})
-            content.addView(type,LinearLayout.LayoutParams(-1,dp(52)))
-            amount=field("金额，例如 16.00",edits?.optString("amount") ?: item.optString("amount"),true).apply{textSize=22f;setTypeface(typeface,Typeface.BOLD)};content.addView(amount,LinearLayout.LayoutParams(-1,dp(58)).apply{topMargin=dp(8)})
+            content.addView(text("收支类型",13f).apply{setTypeface(typeface,Typeface.BOLD);setPadding(dp(4),dp(14),dp(4),dp(6))})
+            selectedTypePosition=when(edits?.optString("type") ?: if(item.optBoolean("peer")) "" else item.optString("type")){"expense"->1;"income"->2;"transfer"->3;"refund"->4;else->0}
+            val typeGroup=RadioGroup(ctx).apply{orientation=RadioGroup.HORIZONTAL;background=background(Color.WHITE,14,1,Color.rgb(220,229,223));setPadding(dp(4),dp(2),dp(4),dp(2))}
+            listOf("支出","收入","转账","退款").forEachIndexed { index,label -> typeGroup.addView(RadioButton(ctx).apply{id=index+1;text=label;gravity=Gravity.CENTER;setTextColor(ink);buttonTintList=android.content.res.ColorStateList.valueOf(teal)},RadioGroup.LayoutParams(0,dp(48),1f)) }
+            if(selectedTypePosition>0) typeGroup.check(selectedTypePosition)
+            content.addView(typeGroup,LinearLayout.LayoutParams(-1,dp(52)))
+            content.addView(text("金额",13f).apply{setTypeface(typeface,Typeface.BOLD);setPadding(dp(4),dp(14),dp(4),dp(6))})
+            amount=field("例如 16.00",edits?.optString("amount") ?: item.optString("amount"),true).apply{textSize=24f;setTypeface(typeface,Typeface.BOLD);setTextColor(teal)};content.addView(amount,LinearLayout.LayoutParams(-1,dp(60)))
             ledgerChoices=rows(item.optJSONArray("ledgers"))
             val accountsByLedger=item.optJSONObject("accountsByLedger")
             val categoriesByLedger=item.optJSONObject("categoriesByLedger")
@@ -194,18 +198,18 @@ object PaymentOverlay {
                 target?.adapter=ArrayAdapter(ctx,android.R.layout.simple_spinner_dropdown_item,accounts.map{it.optString("name")})
                 accounts.indexOfFirst{it.optString("id")==preferredAccount}.takeIf{it>=0}?.let{account?.setSelection(it)}
                 accounts.indexOfFirst{it.optString("id")==preferredTarget}.takeIf{it>=0}?.let{target?.setSelection(it)}
-                rebuildCategories(if(type?.selectedItemPosition==2)"income" else "expense",preferredCategory)
+                rebuildCategories(if(selectedTypePosition==2)"income" else "expense",preferredCategory)
             }
             fun updateType() {
-                val transfer=type?.selectedItemPosition==3
-                val refund=type?.selectedItemPosition==4
+                val transfer=selectedTypePosition==3
+                val refund=selectedTypePosition==4
                 target?.visibility=if(transfer) View.VISIBLE else View.GONE;targetLabel.visibility=if(transfer)View.VISIBLE else View.GONE
-                val direction=if(type?.selectedItemPosition==2) "income" else "expense"
+                val direction=if(selectedTypePosition==2) "income" else "expense"
                 rebuildCategories(direction,edits?.optString("categoryId") ?: item.optString("categoryId"))
                 category?.visibility=if(transfer || refund)View.GONE else View.VISIBLE;categorySearch?.visibility=if(transfer || refund)View.GONE else View.VISIBLE
             }
-            categorySearch?.addTextChangedListener(object:TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){if(type?.selectedItemPosition!=3 && type?.selectedItemPosition!=4)rebuildCategories(if(type?.selectedItemPosition==2)"income" else "expense")};override fun afterTextChanged(s:Editable?){}})
-            type?.onItemSelectedListener=object:AdapterView.OnItemSelectedListener {override fun onItemSelected(parent:AdapterView<*>?,v:View?,position:Int,id:Long){updateType()};override fun onNothingSelected(parent:AdapterView<*>?) {}}
+            categorySearch?.addTextChangedListener(object:TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){if(selectedTypePosition!=3 && selectedTypePosition!=4)rebuildCategories(if(selectedTypePosition==2)"income" else "expense")};override fun afterTextChanged(s:Editable?){}})
+            typeGroup.setOnCheckedChangeListener { _, checkedId -> selectedTypePosition=checkedId;updateType() }
             ledger?.onItemSelectedListener=object:AdapterView.OnItemSelectedListener {override fun onItemSelected(parent:AdapterView<*>?,v:View?,position:Int,id:Long){rebuildLedgerOptions()};override fun onNothingSelected(parent:AdapterView<*>?) {}}
             rebuildLedgerOptions(edits?.optString("accountId") ?: item.optString("accountId"),edits?.optString("targetAccountId") ?: "",edits?.optString("categoryId") ?: item.optString("categoryId"))
             updateType()

@@ -198,6 +198,15 @@ class PaymentCaptureGuardTest {
             PaymentCaptureGuard.pageReason("com.tencent.mm", "退款中\n12.93元\n退款记录"),
         )
     }
+    @Test fun refundReplayIdentityIgnoresUnstableMerchantText() {
+        val detailed = "已退款¥12.93\n退款金额 12.93元\n商户全称 南阳金冠智能开关有限公司"
+        val sparse = "退款成功\n退款金额 12.93元"
+
+        assertEquals(
+            PaymentCaptureGuard.replayIdentity("com.tencent.mm", detailed),
+            PaymentCaptureGuard.replayIdentity("com.tencent.mm", sparse),
+        )
+    }
     @Test fun screenshotFallbackRequiresRecentChatTimestampAndStrongCardFields() {
         val now=SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).parse("2026-10-06 09:01")!!.time
         fun line(text:String,top:Int)=OcrLine(text,20,top,500,top+30)

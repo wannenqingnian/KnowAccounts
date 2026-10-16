@@ -219,7 +219,7 @@ object PaymentAutomation {
         // Notification and accessibility/OCR may report the same payment with
         // different source IDs. Suppress only a short semantic repeat window so
         // a later legitimate purchase of the same amount remains valid.
-        val semantic = PaymentCaptureGuard.semanticIdentity(packageName, text)
+        val semantic = PaymentCaptureGuard.replayIdentity(packageName, text)
         val recentFingerprint = if (semantic.isEmpty()) "" else MessageDigest.getInstance("SHA-256")
             .digest("${cfg.optString("ledgerId")}|$semantic".toByteArray())
             .joinToString("") { "%02x".format(it) }
@@ -229,9 +229,11 @@ object PaymentAutomation {
             semantic.contains("|time:") -> 10 * 60 * 1000L
             else -> 30_000L
         }
+        val replayHistory = p.getString("recentCaptures", "") ?: ""
+        val legacyRepeat = p.getString("recentCapture", "") == recentFingerprint &&
+            now - p.getLong("recentCaptureTime", 0L) in 0..semanticReplayWindow
         if (recentFingerprint.isNotEmpty() &&
-            p.getString("recentCapture", "") == recentFingerprint &&
-            now - p.getLong("recentCaptureTime", 0L) in 0..semanticReplayWindow) {
+            (legacyRepeat || PaymentReplayHistory.contains(replayHistory, recentFingerprint, now, semanticReplayWindow))) {
             PaymentTrace.event(c,"replay_skipped",packageName,kind,digest)
             return
         }
@@ -247,7 +249,10 @@ object PaymentAutomation {
         val history = JSONArray(); for (i in maxOf(0, seen.length() - 499) until seen.length()) history.put(seen.getString(i)); history.put(digest)
         val edit = p.edit().putString("queue", next.toString()).putString("seen", history.toString())
             .putInt("dropped", p.getInt("dropped", 0) + dropped)
-        if (recentFingerprint.isNotEmpty()) edit.putString("recentCapture", recentFingerprint).putLong("recentCaptureTime", now)
+        if (recentFingerprint.isNotEmpty()) edit.putString(
+            "recentCaptures",
+            PaymentReplayHistory.record(replayHistory, recentFingerprint, now),
+        ).remove("recentCapture").remove("recentCaptureTime")
         check(edit.commit())
         PaymentTrace.event(c,"queued",packageName,kind,digest,next.length())
         if(dropped>0) PaymentTrace.event(c,"queue_dropped",count=dropped)

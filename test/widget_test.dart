@@ -169,6 +169,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.text('手动记账'));
       await tester.pumpAndSettle();
+      expect(find.byType(Table), findsNothing);
+      expect(find.byKey(const ValueKey('transaction_amount')), findsOneWidget);
       await tester.enterText(find.byType(TextFormField).first, '38.50');
       await tester.enterText(find.byType(TextFormField).at(1), '瑞幸咖啡');
       final save = find.text('保存账目');

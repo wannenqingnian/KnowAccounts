@@ -327,24 +327,6 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
     });
   }
 
-  void _key(String value) {
-    if (_saving) return;
-    final current = _amount.text;
-    if (value == 'backspace') {
-      _amount.text = current.isEmpty
-          ? ''
-          : current.substring(0, current.length - 1);
-    } else if (value == 'clear') {
-      _amount.clear();
-    } else if (value == '.' && current.contains('.')) {
-      return;
-    } else {
-      _amount.text = current == '0' && value != '.' ? value : '$current$value';
-    }
-    _amount.selection = TextSelection.collapsed(offset: _amount.text.length);
-    setState(() {});
-  }
-
   IconData _categoryIcon(Category category) {
     final value = '${category.iconKey}${category.name}';
     if (value.contains(RegExp('餐|吃|饮|食'))) return Icons.restaurant;
@@ -576,25 +558,6 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
         ),
       );
     }
-
-    Widget numberKey(String value, {IconData? icon}) => InkWell(
-      onTap: () => _key(value),
-      child: SizedBox(
-        height: 58,
-        child: Center(
-          child: icon == null
-              ? Text(
-                  value,
-                  style: TextStyle(
-                    color: ink,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                  ),
-                )
-              : Icon(icon, color: const Color(0xFF526177)),
-        ),
-      ),
-    );
 
     final title = refund
         ? (_isReimbursement ? '记录报销到账' : '关联退款')
@@ -843,6 +806,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                           child: Column(
                             children: [
                               TextFormField(
+                                key: const ValueKey('transaction_amount'),
                                 controller: _amount,
                                 enabled: !_saving,
                                 keyboardType:
@@ -1154,53 +1118,6 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                               ),
                             ),
                           ),
-                        Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(color: const Color(0xFFE4E9F1)),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Table(
-                            border: const TableBorder.symmetric(
-                              inside: BorderSide(color: Color(0xFFE4E9F1)),
-                            ),
-                            children: [
-                              TableRow(
-                                children: [
-                                  numberKey('7'),
-                                  numberKey('8'),
-                                  numberKey('9'),
-                                  numberKey('backspace', icon: Icons.backspace),
-                                ],
-                              ),
-                              TableRow(
-                                children: [
-                                  numberKey('4'),
-                                  numberKey('5'),
-                                  numberKey('6'),
-                                  numberKey('clear', icon: Icons.clear),
-                                ],
-                              ),
-                              TableRow(
-                                children: [
-                                  numberKey('1'),
-                                  numberKey('2'),
-                                  numberKey('3'),
-                                  numberKey('00'),
-                                ],
-                              ),
-                              TableRow(
-                                children: [
-                                  numberKey('.'),
-                                  numberKey('0'),
-                                  const SizedBox(height: 58),
-                                  const SizedBox(height: 58),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(

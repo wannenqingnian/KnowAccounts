@@ -2,12 +2,12 @@
 
 离线优先的智能记账 App，支持手动记账、自动记账、OCR 和本地语音识别。账本、识别、解析、学习与统计默认在设备内完成，不依赖账号或云端服务。
 
-当前稳定版本：`0.29.6`。
+当前稳定版本：`0.29.7`。
 
 ## 下载
 
-- [Android ARM64 APK](https://github.com/wannenqingnian/KnowAccounts/releases/download/v0.29.6/smart-ledger-0.29.6-arm64.apk)
-- [SHA-256 校验文件](https://github.com/wannenqingnian/KnowAccounts/releases/download/v0.29.6/smart-ledger-0.29.6-arm64.apk.sha256)
+- [Android ARM64 APK](https://github.com/wannenqingnian/KnowAccounts/releases/download/v0.29.7/smart-ledger-0.29.7-arm64.apk)
+- [SHA-256 校验文件](https://github.com/wannenqingnian/KnowAccounts/releases/download/v0.29.7/smart-ledger-0.29.7-arm64.apk.sha256)
 - [全部版本](https://github.com/wannenqingnian/KnowAccounts/releases)
 
 当前发布包支持 Android 7.0 及以上，仅提供 `arm64-v8a` APK。iOS 和 Linux 项目源码保留在仓库中，但暂未提供安装包。
@@ -68,7 +68,7 @@ python3 tool/verify_ocr_jni_apk.py build/app/outputs/flutter-apk/app-release.apk
 python3 tool/verify_automation_apk.py build/app/outputs/flutter-apk/app-release.apk --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt"
 ```
 
-GitHub Actions 会在 `main` 更新时构建 Android ARM64 产物。推送与 `pubspec.yaml` 一致的版本标签（例如 `v0.29.6`）后，会使用 GitHub Actions Secrets 中保存的固定签名构建 APK、生成 SHA-256 文件并发布 GitHub Release。签名私钥不会提交到源码。
+GitHub Actions 会在 `main` 更新时构建 Android ARM64 产物。推送与 `pubspec.yaml` 一致的版本标签（例如 `v0.29.7`）后，会使用 GitHub Actions Secrets 中保存的固定签名构建 APK、生成 SHA-256 文件并发布 GitHub Release。签名私钥不会提交到源码。
 
 ## 项目结构
 

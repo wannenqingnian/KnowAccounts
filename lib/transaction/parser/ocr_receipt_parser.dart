@@ -116,6 +116,8 @@ class OcrReceiptParser {
     '收款单位',
     '收款人',
     '对方账户',
+    '付款给',
+    '支付给',
   ];
   static const accountKeys = [
     '支付方式',
@@ -123,6 +125,8 @@ class OcrReceiptParser {
     '付款账户',
     '扣款账户',
     '支付账户',
+    '付款来源',
+    '支付来源',
     '支付渠道',
     '转入方式',
     '充值方式',
@@ -211,8 +215,8 @@ class OcrReceiptParser {
           RegExp(r'退款成功|已退款|已全额退款|退款处理完成').hasMatch(s),
     );
     final useful = fields.where((f) => !f.key.endsWith('校验')).length;
-    final hasMoney = lines.any(_headline.hasMatch) ||
-        lines.any((s) => _money.hasMatch(s));
+    final hasMoney =
+        lines.any(_headline.hasMatch) || lines.any((s) => _money.hasMatch(s));
     // Recognize receipt structure, but leave ordinary prose to the text parser.
     if (useful < 1 && !(hasStatus && hasMoney)) {
       return null;

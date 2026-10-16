@@ -142,6 +142,10 @@ object PaymentCaptureGuard {
         }
         return "$packageName|scene:$scene|amount:$amount|peer:$peer${moment?.let { "|time:$it" } ?: ""}"
     }
+    fun replayIdentity(packageName: String, input: String): String {
+        val identity = semanticIdentity(packageName, input)
+        return if (identity.contains("|scene:refund|")) identity.replace(Regex("\\|peer:[^|]*"), "") else identity
+    }
     /**
      * Picks a transaction amount by field role instead of the first number on
      * screen. A receipt can contain original price, discount, balance and the
