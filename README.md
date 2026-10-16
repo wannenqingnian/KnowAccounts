@@ -20,7 +20,7 @@
 
 历史版本提供过 ARM64 Release 测试包，支持 Android 7.0 及以上。当前 `0.29.6` 源码已通过 Android Debug 构建并推送到 GitHub，但尚未生成正式签名 Release，也未完成真机安装验证，目前没有对应的 GitHub Release。
 
-GitHub Actions 会在 `main` 更新时构建并保存 14 天的 ARM64 APK。发布版本时推送与 `pubspec.yaml` 版本一致的标签，例如 `v0.29.6`；流程会自动校验 APK、生成 SHA-256 文件并创建预发布 GitHub Release。也可在 Actions 页面手动运行构建，但手动运行只生成临时产物，不发布 Release。当前 APK 仍使用开发签名，因此流程不会标记为正式版。
+GitHub Actions 会在 `main` 更新时构建并保存 14 天的 ARM64 APK。发布版本时推送与 `pubspec.yaml` 版本一致的标签，例如 `v0.29.6`；流程会自动恢复保存在 GitHub Actions Secrets 中的稳定开发签名、校验 APK、生成 SHA-256 文件并创建预发布 GitHub Release。也可在 Actions 页面手动运行构建，但手动运行只生成临时产物，不发布 Release。当前仍是开发签名，因此流程不会标记为正式版；keystore 私钥不会提交到公开源码。
 
 ## 已实现
 

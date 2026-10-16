@@ -35,12 +35,40 @@ jobs:
           cache: true
 
       - name: Install Android build components
-        run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+        shell: bash
+        run: |
+          sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' -type f | head -n 1)"
+          if [[ -z "$sdkmanager_path" ]]; then
+            echo "sdkmanager was not found under $ANDROID_HOME." >&2
+            exit 1
+          fi
+          "$sdkmanager_path" --install "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
 
       - name: Fetch Flutter dependencies
         run: flutter pub get
 
+      - name: Restore Android signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+        shell: bash
+        run: |
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD ANDROID_STORE_PASSWORD; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Required GitHub Actions secret $name is missing." >&2
+              exit 1
+            fi
+          done
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/smart-ledger-development.keystore"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/smart-ledger-development.keystore" >> "$GITHUB_ENV"
+
       - name: Build ARM64 release APK
+        env:
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
         run: flutter build apk --release --target-platform android-arm64
 
       - name: Verify release JNI libraries

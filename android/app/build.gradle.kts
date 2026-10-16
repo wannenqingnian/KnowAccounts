@@ -4,6 +4,8 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val ciKeystorePath = System.getenv("ANDROID_KEYSTORE_PATH")
+
 android {
     namespace = "com.smartledger.smart_ledger"
     compileSdk = flutter.compileSdkVersion
@@ -29,6 +31,17 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (!ciKeystorePath.isNullOrBlank()) {
+            create("ciRelease") {
+                storeFile = file(ciKeystorePath)
+                storePassword = System.getenv("ANDROID_STORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     // Compress native runtimes in the download; Android extracts them on install.
     // Flutter's target-platform flag does not filter every transitive AAR, so
     // exclude their unused ABIs again at the final packaging boundary.
@@ -47,9 +60,13 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // CI restores the stable development key from GitHub Secrets.
+            signingConfig =
+                if (ciKeystorePath.isNullOrBlank()) {
+                    signingConfigs.getByName("debug")
+                } else {
+                    signingConfigs.getByName("ciRelease")
+                }
         }
     }
 }
