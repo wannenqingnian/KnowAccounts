@@ -387,3 +387,16 @@ APK 为 37,278,847 字节，版本 0.21.14+48 / versionCode 2048，SHA-256：
 `d4f3e12b8b2b47607848df77faaae0f9aa11d0ee92894bb2c645c1f26fe1a4ce`。安装包已核验最低
 API 24、目标 API 36、仅 arm64-v8a、APK Signature Scheme v2、后台入口、受保护服务、23 个支付
 来源、无障碍单帧截图及通知栏快捷入口。
+
+## 0.29.6 记账界面与账本切换验证
+
+2026-10-16 完成手动记账界面改版、手动记账切换账本和自动记账悬浮弹窗布局优化。验证结果：
+
+- `flutter analyze --no-pub lib/features/transaction_editor.dart lib/features/home_shell.dart test/widget_test.dart`：通过，无问题。
+- 手动记账持久化回归测试与新建账单切换账本回归测试：通过。
+- `test/payment_confirmation_test.dart`：13 项通过，包含自动记账切换目标账本场景。
+- Android Debug Gradle 构建：通过，共执行 241 项任务。
+
+本机项目和 Flutter Pub 缓存分别位于不同盘符，Kotlin 增量缓存曾报告路径不一致；清理对应生成缓存并以 `-Pkotlin.incremental=false` 重建后成功，未修改项目构建配置。当前仍有第三方 `file_picker` Kotlin 插件弃用、Gradle 10 兼容性和 SDK XML 版本提示，不是本次界面修改引入。
+
+未完成项：真机安装与支付页面悬浮窗验证、全量 Flutter 测试、正式签名 Release 构建、APK 校验与 GitHub Release 发布。
