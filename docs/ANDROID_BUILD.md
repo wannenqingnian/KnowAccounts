@@ -265,7 +265,7 @@ python3 tool/verify_automation_apk.py build/app/outputs/flutter-apk/app-arm64-v8
 
 188项Flutter测试、28项Android原生JUnit测试及Flutter静态分析通过。最终唯一ARM64 Release APK为36,810,931字节（35.11MiB），SHA-256：`f15d4e737c9fc74727ebbe242b53d18e6d6839d87583b5454654dd5179bf2993`。
 
-## 0.19.0 一木记账 REA 对照改进（仅ARM64）
+## 0.19.0 某记账软件 REA 对照改进（仅ARM64）
 
 版本0.19.0+29 / versionCode 2029。自动记账改为明确支付页触发，离开支付流程会清除残留会话；OCR 执行期间暂停新的页面读取，成功后抑制同源事件五秒。补齐转账、充值、提现、到账等金额、时间和账户字段。数据库 Schema、按需下载的 OCR/语音模型格式和开发签名不变。
 
@@ -351,9 +351,9 @@ python3 tool/verify_automation_apk.py build/app/outputs/flutter-apk/app-arm64-v8
 
 ## 0.21.11 全来源字段解析（仅 ARM64）
 
-一木记账 6.1.6 静态分派中可确认的微信、支付宝、京东系、美团系、淘宝系、拼多多、抖音系、
+某记账软件 6.1.6 静态分派中可确认的微信、支付宝、京东系、美团系、淘宝系、拼多多、抖音系、
 快手系、饿了么、盒马、云闪付、华为钱包和建行生活适配器均补齐来源专属完成状态、页面路由、
-金额、商户、账户与时间字段。知账原有滴滴兼容仍保留，但不宣称来源于一木适配器。
+金额、商户、账户与时间字段。知账原有滴滴兼容仍保留，但不宣称来源于该软件适配器。
 
 Flutter 静态分析无问题，204 项 Flutter 测试及 Android 原生 JUnit 测试通过。最终 ARM64 Release
 APK 为 36,894,219 字节，版本 0.21.11+45 / versionCode 2045，SHA-256：

@@ -2,7 +2,7 @@
 
 离线优先的智能记账 App，目前交付 `0.29.6` 开发测试版。Android 已接入按需下载的飞桨 PP-OCRv6 与 SenseVoiceSmall 本地语音识别。使用 Flutter、Riverpod 和 SQLite/Drift，生成 Android、iOS、Linux 项目。首次启动仅创建空账本、默认账户和分类，不插入演示交易。
 
-当前完成范围、非云端缺口、一木记账对比剩余项及最后实施的 iOS 路线统一记录在[开发计划与功能差异](docs/DEVELOPMENT.md)。
+当前完成范围、非云端缺口、某记账软件对比剩余项及最后实施的 iOS 路线统一记录在[开发计划与功能差异](docs/DEVELOPMENT.md)。
 
 ## 当前交付状态（2026-10-16）
 
