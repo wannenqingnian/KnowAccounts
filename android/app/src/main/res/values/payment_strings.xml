@@ -1,0 +1,3 @@
+<resources>
+    <string name="payment_accessibility_description">你开启增强模式后，知账读取你选中支付软件的页面文字，仅处理付款成功或账单详情用于离线记账，其他页面内容不保存。不点击按钮、不执行付款、不读取密码，也不上传页面内容。可随时关闭。</string>
+</resources>

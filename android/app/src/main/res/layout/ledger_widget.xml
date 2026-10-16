@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="@drawable/widget_background">
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="知账快捷记账"
+        android:textColor="#174A43"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:paddingBottom="8dp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+        <Button android:id="@+id/widget_quick" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="记一笔" android:textSize="12sp" />
+        <Button android:id="@+id/widget_voice" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="语音" android:textSize="12sp" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+        <Button android:id="@+id/widget_capture" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="OCR截图" android:textSize="12sp" />
+        <Button android:id="@+id/widget_templates" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="模板" android:textSize="12sp" />
+    </LinearLayout>
+</LinearLayout>

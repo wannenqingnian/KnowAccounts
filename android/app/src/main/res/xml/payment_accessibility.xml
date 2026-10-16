@@ -1,0 +1,9 @@
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="50"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
+    android:canRetrieveWindowContent="true"
+    android:canTakeScreenshot="true"
+    android:description="@string/payment_accessibility_description"
+    android:packageNames="com.tencent.mm,com.eg.android.AlipayGphone,com.jingdong.app.mall,com.jd.jrapp,com.sankuai.meituan,com.sankuai.meituan.takeoutnew,com.unionpay,com.taobao.taobao,com.xunmeng.pinduoduo,com.ss.android.ugc.aweme,me.ele,com.sdu.didi.psnger,com.huawei.wallet,com.dianping.v1,com.ss.android.ugc.aweme.lite,com.ss.android.ugc.livelite,com.ss.android.yumme.video,com.wudaokou.hippo,com.kuaishou.nebula,com.smile.gifmaker,com.alibaba.wireless,com.taobao.idlefish,com.ccb.longjiLife" />
