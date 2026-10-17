@@ -5,6 +5,7 @@ import '../automation/automation_bridge.dart';
 import '../automation/payment_apps.dart';
 import '../automation/notification_shortcuts.dart';
 import '../domain/models.dart';
+import '../finance/analysis.dart';
 import 'action_form.dart';
 
 Future<void> showAutomationPage(BuildContext context) => Navigator.push(
@@ -87,23 +88,8 @@ class _AutomationPageState extends ConsumerState<AutomationPage>
     }
   }
 
-  int _todayExpense() {
-    final now = DateTime.now();
-    var total = 0;
-    for (final entry in ref.read(ledgerProvider).entries) {
-      final date = entry.occurredDate;
-      if (entry.deleted ||
-          entry.excludeFromReports ||
-          date.year != now.year ||
-          date.month != now.month ||
-          date.day != now.day) {
-        continue;
-      }
-      if (entry.type == TransactionType.expense) total += entry.amountMinor;
-      if (entry.type == TransactionType.refund) total -= entry.amountMinor;
-    }
-    return total < 0 ? 0 : total;
-  }
+  int _todayExpense() =>
+      todayExpenseTotal(ref.read(ledgerProvider).entries, DateTime.now());
 
   Future<void> _toggleShortcut(String action, bool selected) async {
     if (selected && _shortcutSelection.length >= 3) {

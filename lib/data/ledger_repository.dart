@@ -4066,7 +4066,8 @@ class LedgerRepository {
             (item) =>
                 item.type == input.type &&
                 item.amountMinor == input.amountMinor &&
-                item.accountId == input.accountId &&
+                (input.accountId.isEmpty ||
+                    item.accountId == input.accountId) &&
                 dateKey(item.occurredDate) == dateKey(input.occurredDate) &&
                 UnifiedTransactionIdentity.normalizeMerchant(item.merchant) ==
                     normalized,

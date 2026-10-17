@@ -78,8 +78,7 @@ Future<Map<String, Object?>?> paymentPreview(
   parsed = await repo.applyAutoCorrectionRule(parsed);
   parsed = await RefundMatcher.resolve(repo, parsed);
   final warnings = {...item.storedWarnings, ...parsed.warnings};
-  final duplicateAssessment =
-      parsed.amountMinor == null || parsed.accountId == null
+  final duplicateAssessment = parsed.amountMinor == null
       ? null
       : await repo.assessDraftDuplicate(
           targetLedger,
@@ -87,7 +86,7 @@ Future<Map<String, Object?>?> paymentPreview(
           TransactionInput(
             type: parsed.type,
             amountMinor: parsed.amountMinor!,
-            accountId: parsed.accountId!,
+            accountId: parsed.accountId ?? '',
             categoryId: parsed.categoryId,
             occurredDate: parsed.occurredDate,
             merchant: parsed.merchant,
@@ -300,6 +299,8 @@ Future<ConfirmationResult> confirmPayment(
                   data['relatedTransactionId'] is String
               ? data['relatedTransactionId'] as String
               : null,
+          reimbursable:
+              type == TransactionType.expense && data['reimbursable'] == true,
         ),
         rememberChoice: data['rememberChoice'] == true,
       );

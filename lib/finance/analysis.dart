@@ -1,4 +1,23 @@
 import '../domain/models.dart';
+import '../domain/money.dart';
+
+int todayExpenseTotal(Iterable<LedgerEntry> entries, DateTime day) {
+  var total = 0;
+  for (final entry in entries) {
+    if (entry.deleted ||
+        entry.excludeFromReports ||
+        dateKey(entry.occurredDate) != dateKey(day)) {
+      continue;
+    }
+    if (entry.type == TransactionType.expense) {
+      total += entry.amountMinor - entry.reimbursedMinor;
+    }
+    if (entry.type == TransactionType.refund && !entry.isReimbursement) {
+      total -= entry.amountMinor;
+    }
+  }
+  return total.clamp(0, 1 << 62).toInt();
+}
 
 /// Amounts stay in integer minor units. Refunds belong to their arrival period.
 class PeriodAnalysis {

@@ -127,7 +127,7 @@ class TransactionDuplicateAssessment {
 
   String get message {
     if (!possible) return '';
-    final basis = matchedByOrder ? '订单号与已有账单一致' : '金额、商户、日期、账户和方向均相符';
+    final basis = matchedByOrder ? '订单号与已有账单一致' : '金额、商户、日期和方向相符';
     return differences.isEmpty ? basis : '$basis；证据差异：${differences.join('；')}';
   }
 }

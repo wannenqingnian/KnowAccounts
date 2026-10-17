@@ -9,6 +9,8 @@ LedgerEntry entry(
   String? category,
   bool deleted = false,
   bool excluded = false,
+  bool reimbursement = false,
+  int reimbursed = 0,
 }) => LedgerEntry(
   id: '$type-$amount-$date',
   type: type,
@@ -21,6 +23,8 @@ LedgerEntry entry(
   categoryName: category,
   deleted: deleted,
   excludeFromReports: excluded,
+  isReimbursement: reimbursement,
+  reimbursedMinor: reimbursed,
 );
 void main() {
   test(
@@ -101,6 +105,20 @@ void main() {
       expect(PeriodAnalysis.comparison(100, 0), '上期为零');
       expect(PeriodAnalysis.comparison(120, 100), '较上期增加 20.0%');
       expect(PeriodAnalysis.comparison(-100, -200), '较上期增加 50.0%');
+    },
+  );
+  test(
+    'today consumption excludes reimbursed expense and reimbursement arrival',
+    () {
+      final day = DateTime(2026, 10, 17);
+      expect(
+        todayExpenseTotal([
+          entry(TransactionType.expense, 10000, day, reimbursed: 10000),
+          entry(TransactionType.refund, 10000, day, reimbursement: true),
+          entry(TransactionType.expense, 2500, day),
+        ], day),
+        2500,
+      );
     },
   );
 }

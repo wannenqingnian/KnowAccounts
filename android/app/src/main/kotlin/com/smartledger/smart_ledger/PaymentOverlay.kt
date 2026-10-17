@@ -46,6 +46,7 @@ object PaymentOverlay {
     private var ledgerChoices: List<JSONObject> = emptyList()
     private var accountChoices: List<JSONObject> = emptyList()
     private var duplicate: CheckBox? = null
+    private var reimbursable: CheckBox? = null
     private var remember: CheckBox? = null
     private var error: TextView? = null
     private fun current() = waiting.values.firstOrNull()
@@ -115,6 +116,7 @@ object PaymentOverlay {
             .put("targetAccountId",selected(target,accountChoices)).put("categoryId",selectedCategory?.optString("id") ?: "")
             .put("newCategoryName",selectedCategory?.optString("newName") ?: "")
             .put("relatedTransactionId",item.optString("relatedTransactionId"))
+            .put("reimbursable",reimbursable?.isChecked == true)
             .put("allowDuplicate",duplicate?.isChecked == true)
             .put("rememberChoice",remember?.isChecked == true)
     }
@@ -207,6 +209,7 @@ object PaymentOverlay {
                 val direction=if(selectedTypePosition==2) "income" else "expense"
                 rebuildCategories(direction,edits?.optString("categoryId") ?: item.optString("categoryId"))
                 category?.visibility=if(transfer || refund)View.GONE else View.VISIBLE;categorySearch?.visibility=if(transfer || refund)View.GONE else View.VISIBLE
+                reimbursable?.visibility=if(selectedTypePosition==1)View.VISIBLE else View.GONE
             }
             categorySearch?.addTextChangedListener(object:TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){if(selectedTypePosition!=3 && selectedTypePosition!=4)rebuildCategories(if(selectedTypePosition==2)"income" else "expense")};override fun afterTextChanged(s:Editable?){}})
             typeGroup.setOnCheckedChangeListener { _, checkedId -> selectedTypePosition=checkedId;updateType() }
@@ -218,6 +221,7 @@ object PaymentOverlay {
             merchant=field("商户/对方（选填）",edits?.optString("merchant") ?: item.optString("merchant")).apply { filters=arrayOf(android.text.InputFilter.LengthFilter(100)) };content.addView(merchant,LinearLayout.LayoutParams(-1,dp(50)).apply{topMargin=dp(8)})
             tags=field("标签（逗号或空格分隔，最多10个）",edits?.optString("tags") ?: "").apply { filters=arrayOf(android.text.InputFilter.LengthFilter(220)) };content.addView(tags,LinearLayout.LayoutParams(-1,dp(50)).apply{topMargin=dp(8)})
             note=field("备注（选填）",edits?.optString("note") ?: item.optString("note")).apply { filters=arrayOf(android.text.InputFilter.LengthFilter(1000)) };content.addView(note,LinearLayout.LayoutParams(-1,dp(50)).apply{topMargin=dp(8)})
+            reimbursable=CheckBox(ctx).apply {text="标记待报销";isChecked=edits?.optBoolean("reimbursable") ?: item.optBoolean("reimbursable");visibility=if(selectedTypePosition==1)View.VISIBLE else View.GONE};content.addView(reimbursable)
             remember=CheckBox(ctx).apply {text="以后遇到同类商户时建议沿用本次设置";isChecked=edits?.optBoolean("rememberChoice") ?: false};content.addView(remember)
             duplicate=CheckBox(ctx).apply {text="确认这是另一笔交易，仍然保存";isChecked=edits?.optBoolean("allowDuplicate") ?: false;visibility=if(item.optBoolean("duplicate"))View.VISIBLE else View.GONE};content.addView(duplicate)
             error=text(item.optString("error"),12f).apply{setTextColor(Color.rgb(190,60,45));setPadding(dp(4),dp(6),dp(4),dp(6))};content.addView(error)

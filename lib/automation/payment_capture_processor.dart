@@ -3,6 +3,7 @@ import '../data/ledger_repository.dart';
 import '../data/family_payment_repository.dart';
 import '../domain/family_payment.dart';
 import '../domain/models.dart';
+import '../domain/money.dart';
 import '../transaction/refund_matcher.dart';
 import '../transaction/confidence/confidence_calibration.dart';
 import '../transaction/transaction_identity.dart';
@@ -52,6 +53,17 @@ class PaymentCaptureProcessor {
         var resolved = await RefundMatcher.resolve(repository, corrected);
         if (resolved.confidence == null) {
           resolved = resolved.withConfidence(parsed.confidence);
+        }
+        final current = now ?? DateTime.now();
+        final refundDate = DateTime.tryParse(
+          resolved.evidence['refund_date'] ?? '',
+        );
+        if (capture.packageName == 'com.tencent.mm' &&
+            capture.kind != 'notification' &&
+            resolved.type == TransactionType.refund &&
+            refundDate != null &&
+            dateKey(refundDate) != dateKey(current)) {
+          return 'discarded';
         }
         if (parsed.familyPayment != null) {
           final familyRepo = FamilyPaymentRepository(repository.db);

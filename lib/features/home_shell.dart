@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../app_state.dart';
 import '../domain/models.dart';
 import '../domain/money.dart';
+import '../finance/analysis.dart';
 import '../transaction/transaction_identity.dart';
 import 'transaction_editor.dart';
 import 'widgets.dart';
@@ -93,26 +94,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
     );
   }
 
-  int _todayExpense() {
-    final now = DateTime.now();
-    var total = 0;
-    for (final entry in _ledger.entries) {
-      if (entry.deleted || entry.excludeFromReports) continue;
-      final date = entry.occurredDate;
-      if (date.year != now.year ||
-          date.month != now.month ||
-          date.day != now.day) {
-        continue;
-      }
-      if (entry.type == TransactionType.expense) {
-        total += entry.amountMinor;
-      }
-      if (entry.type == TransactionType.refund) {
-        total -= entry.amountMinor;
-      }
-    }
-    return total.clamp(0, 1 << 62).toInt();
-  }
+  int _todayExpense() => todayExpenseTotal(_ledger.entries, DateTime.now());
 
   Future<void> _syncTodayNotification() async {
     try {

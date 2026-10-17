@@ -442,6 +442,36 @@ void main() {
       expect(await repo.entries('personal'), isEmpty);
     },
   );
+  test('historical accessibility refund page is discarded', () async {
+    final staleRefund = event(
+      '微信支付\n退款成功\n退款金额 12.93元\n退款时间 2026年10月11日 12:54:05\n商户名称 南阳金冠智能开关有限公司',
+      kind: 'accessibility',
+      packageName: 'com.tencent.mm',
+      autoSave: false,
+      digit: '9',
+    );
+    expect(
+      await PaymentCaptureProcessor(
+        repo,
+      ).process(staleRefund, now: DateTime(2026, 10, 16, 20, 17)),
+      'discarded',
+    );
+    expect(await repo.pendingDrafts('personal'), isEmpty);
+
+    final currentRefund = event(
+      '微信支付\n退款成功\n退款金额 12.93元\n退款时间 2026年10月16日 20:10:00\n商户名称 南阳金冠智能开关有限公司',
+      kind: 'accessibility',
+      packageName: 'com.tencent.mm',
+      autoSave: false,
+      digit: '8',
+    );
+    expect(
+      await PaymentCaptureProcessor(
+        repo,
+      ).process(currentRefund, now: DateTime(2026, 10, 16, 20, 17)),
+      'pending',
+    );
+  });
   test(
     'notification and accessibility plus OCR cannot auto post two copies; pending duplicate warning survives reload',
     () async {

@@ -29,7 +29,11 @@ void main() {
     ledgerId: 'personal',
     autoSave: false,
   );
-  Map<String, Object?> command(String digit, {String type = 'expense'}) => {
+  Map<String, Object?> command(
+    String digit, {
+    String type = 'expense',
+    bool reimbursable = false,
+  }) => {
     'draftId': 'auto-${digit * 64}',
     'ledgerId': 'personal',
     'operation': 'confirm',
@@ -41,6 +45,7 @@ void main() {
     'categoryId': type == 'income' ? income : expense,
     'merchant': '精品沙县小吃',
     'note': '悬浮窗确认',
+    'reimbursable': reimbursable,
   };
   setUp(() async {
     db = AppDatabase.memory();
@@ -120,6 +125,19 @@ void main() {
       final created = categories.singleWhere((c) => c.name == '工作午餐');
       expect(created.type, TransactionType.expense);
       expect((await repo.entries('personal')).single.categoryId, created.id);
+    },
+  );
+  test(
+    'automatic confirmation can mark an expense for reimbursement',
+    () async {
+      final event = capture('8');
+      await PaymentCaptureProcessor(repo).process(event, now: time);
+      final result = await confirmPayment(
+        repo,
+        command('8', reimbursable: true),
+      );
+      expect(result.ok, true, reason: result.message);
+      expect((await repo.entries('personal')).single.reimbursable, true);
     },
   );
   test('overlay preview can route a pending bill to another ledger', () async {
@@ -327,6 +345,21 @@ void main() {
         true,
       );
       expect(await repo.entries('personal'), hasLength(2));
+    },
+  );
+  test(
+    'revisited bill is flagged duplicate even when account is not recognized',
+    () async {
+      await PaymentCaptureProcessor(repo).process(capture('a'), now: time);
+      await confirmPayment(repo, command('a'));
+      final revisit = capture(
+        'b',
+        text: '交易详情\n精品沙县小吃\n-16.00\n当前状态 支付成功\n支付时间 2026年10月05日 12:05:15',
+      );
+      await PaymentCaptureProcessor(repo).process(revisit, now: time);
+      final preview = await paymentPreview(repo, revisit);
+      expect(preview!['accountId'], isNull);
+      expect(preview['duplicate'], true);
     },
   );
   test(
