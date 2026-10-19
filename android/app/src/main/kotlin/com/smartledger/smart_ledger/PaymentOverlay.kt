@@ -178,8 +178,45 @@ object PaymentOverlay {
             account=spinner(accounts.map{it.optString("name")},maxOf(0,accounts.indexOfFirst{it.optString("id")==(edits?.optString("accountId") ?: item.optString("accountId"))}));content.addView(account,LinearLayout.LayoutParams(-1,dp(52)))
             val targetLabel=text("转入账户（仅内部转账）");content.addView(targetLabel)
             target=spinner(accounts.map{it.optString("name")},maxOf(0,accounts.indexOfFirst{it.optString("id")==edits?.optString("targetAccountId")}));content.addView(target,LinearLayout.LayoutParams(-1,dp(52)))
-            categorySearch=field("搜索分类，找不到可直接新增",edits?.optString("newCategoryName") ?: "");content.addView(categorySearch,LinearLayout.LayoutParams(-1,dp(50)).apply{topMargin=dp(8)})
-            category=spinner(emptyList());content.addView(category,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
+            val categoryPanel=LinearLayout(ctx).apply{orientation=LinearLayout.VERTICAL}
+            val categoryGrid=GridLayout(ctx).apply{columnCount=5;alignmentMode=GridLayout.ALIGN_BOUNDS}
+            categoryPanel.addView(categoryGrid,LinearLayout.LayoutParams(-1,-2).apply{topMargin=dp(8)})
+            val childLabel=text("二级子类：",12f).apply{setTextColor(Color.rgb(145,160,181));setTypeface(typeface,Typeface.BOLD)}
+            val childRow=LinearLayout(ctx).apply{orientation=LinearLayout.HORIZONTAL}
+            val childScroller=HorizontalScrollView(ctx).apply{isHorizontalScrollBarEnabled=false;addView(childRow)}
+            categoryPanel.addView(childLabel);categoryPanel.addView(childScroller,LinearLayout.LayoutParams(-1,dp(46)))
+            categorySearch=field("搜索分类，找不到可直接新增",edits?.optString("newCategoryName") ?: "");categoryPanel.addView(categorySearch,LinearLayout.LayoutParams(-1,dp(50)).apply{topMargin=dp(8)})
+            category=spinner(emptyList());categoryPanel.addView(category,LinearLayout.LayoutParams(-1,dp(52)).apply{topMargin=dp(6)})
+            content.addView(categoryPanel)
+            fun categorySymbol(item:JSONObject):String {
+                val value="${item.optString("iconKey")}${item.optString("name")}"
+                return when {Regex("餐|吃|饮|食").containsMatchIn(value)->"餐";Regex("交通|车|出行").containsMatchIn(value)->"车";Regex("购物|百货").containsMatchIn(value)->"购";Regex("果|菜|生鲜").containsMatchIn(value)->"鲜";Regex("居家|居住|住房|物业").containsMatchIn(value)->"居";Regex("娱乐|游戏").containsMatchIn(value)->"娱";Regex("医疗|健康").containsMatchIn(value)->"医";Regex("学习|教育").containsMatchIn(value)->"学";Regex("人情|礼物").containsMatchIn(value)->"礼";Regex("工资|收入").containsMatchIn(value)->"收";else->"●"}
+            }
+            fun selectCategory(id:String) {
+                val index=categoryChoices.indexOfFirst{it.optString("id")==id}
+                if(index>=0) category?.setSelection(index)
+            }
+            fun rebuildCategoryTiles(direction:String,preferred:String) {
+                val typed=allCategories.filter{it.optString("type")==direction}
+                val roots=typed.filter{item->item.optString("parentId").isEmpty() || typed.none{it.optString("id")==item.optString("parentId")}}
+                val selected=typed.firstOrNull{it.optString("id")==preferred}
+                val root=if(selected?.optString("parentId").isNullOrEmpty()) selected else typed.firstOrNull{it.optString("id")==selected?.optString("parentId")}
+                categoryGrid.removeAllViews()
+                roots.take(9).forEach { item ->
+                    val active=root?.optString("id")==item.optString("id")
+                    val button=Button(ctx).apply{text="${categorySymbol(item)}\n${item.optString("name")}";textSize=11f;gravity=Gravity.CENTER;isAllCaps=false;setTextColor(if(active)Color.WHITE else Color.rgb(82,97,119));background=background(if(active)teal else Color.rgb(241,245,249),16);setPadding(dp(2),dp(4),dp(2),dp(4));setOnClickListener{if(categorySearch?.text?.isNotEmpty()==true)categorySearch?.setText("");selectCategory(item.optString("id"))}}
+                    categoryGrid.addView(button,GridLayout.LayoutParams().apply{width=0;height=dp(76);columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);setMargins(dp(2),dp(2),dp(2),dp(2))})
+                }
+                val allButton=Button(ctx).apply{text="☷\n全部分类";textSize=11f;gravity=Gravity.CENTER;isAllCaps=false;setTextColor(Color.rgb(138,154,176));background=background(Color.rgb(241,245,249),16);setPadding(dp(2),dp(4),dp(2),dp(4));setOnClickListener{categorySearch?.requestFocus()}}
+                categoryGrid.addView(allButton,GridLayout.LayoutParams().apply{width=0;height=dp(76);columnSpec=GridLayout.spec(GridLayout.UNDEFINED,1f);setMargins(dp(2),dp(2),dp(2),dp(2))})
+                val children=if(root==null) emptyList() else typed.filter{it.optString("parentId")==root.optString("id")}
+                childRow.removeAllViews()
+                children.forEach { item ->
+                    val active=selected?.optString("id")==item.optString("id")
+                    childRow.addView(Button(ctx).apply{text=item.optString("name");textSize=12f;isAllCaps=false;setTextColor(if(active)Color.WHITE else Color.rgb(82,97,119));background=background(if(active)teal else Color.WHITE,18,1,Color.rgb(220,229,223));setOnClickListener{selectCategory(item.optString("id"))}},LinearLayout.LayoutParams(-2,dp(40)).apply{rightMargin=dp(6)})
+                }
+                childLabel.visibility=if(children.isEmpty())View.GONE else View.VISIBLE;childScroller.visibility=childLabel.visibility
+            }
             fun rebuildCategories(direction:String, preferred:String="") {
                 val query=categorySearch?.text?.toString()?.trim() ?: ""
                 val matches=allCategories.filter{it.optString("type")==direction && (query.isEmpty() || it.optString("name").contains(query,true))}
@@ -187,9 +224,10 @@ object PaymentOverlay {
                     addAll(matches)
                     if(query.isNotEmpty() && query.length<=40 && matches.none{it.optString("name").equals(query,true)}) add(JSONObject().put("id","").put("name","＋ 新增分类“$query”").put("newName",query))
                 }
-                category?.adapter=ArrayAdapter(ctx,android.R.layout.simple_spinner_dropdown_item,categoryChoices.map{it.optString("name")})
+                category?.adapter=ArrayAdapter(ctx,android.R.layout.simple_spinner_dropdown_item,categoryChoices.map{item->val parent=allCategories.firstOrNull{it.optString("id")==item.optString("parentId")};if(parent==null)item.optString("name") else "${parent.optString("name")} / ${item.optString("name")}"})
                 val index=if(preferred.isNotEmpty()) categoryChoices.indexOfFirst{it.optString("id")==preferred} else if(query.isNotEmpty()) categoryChoices.indexOfFirst{it.optString("newName")==query} else 0
                 if(index>=0) category?.setSelection(index)
+                rebuildCategoryTiles(direction,if(index>=0)categoryChoices[index].optString("id") else preferred)
             }
             fun rebuildLedgerOptions(preferredAccount:String="", preferredTarget:String="", preferredCategory:String="") {
                 val ledgerId=selected(ledger,ledgerChoices)
@@ -208,10 +246,11 @@ object PaymentOverlay {
                 target?.visibility=if(transfer) View.VISIBLE else View.GONE;targetLabel.visibility=if(transfer)View.VISIBLE else View.GONE
                 val direction=if(selectedTypePosition==2) "income" else "expense"
                 rebuildCategories(direction,edits?.optString("categoryId") ?: item.optString("categoryId"))
-                category?.visibility=if(transfer || refund)View.GONE else View.VISIBLE;categorySearch?.visibility=if(transfer || refund)View.GONE else View.VISIBLE
+                categoryPanel.visibility=if(transfer || refund)View.GONE else View.VISIBLE
                 reimbursable?.visibility=if(selectedTypePosition==1)View.VISIBLE else View.GONE
             }
             categorySearch?.addTextChangedListener(object:TextWatcher{override fun beforeTextChanged(s:CharSequence?,start:Int,count:Int,after:Int){};override fun onTextChanged(s:CharSequence?,start:Int,before:Int,count:Int){if(selectedTypePosition!=3 && selectedTypePosition!=4)rebuildCategories(if(selectedTypePosition==2)"income" else "expense")};override fun afterTextChanged(s:Editable?){}})
+            category?.onItemSelectedListener=object:AdapterView.OnItemSelectedListener {override fun onItemSelected(parent:AdapterView<*>?,v:View?,position:Int,id:Long){rebuildCategoryTiles(if(selectedTypePosition==2)"income" else "expense",categoryChoices.getOrNull(position)?.optString("id") ?: "")};override fun onNothingSelected(parent:AdapterView<*>?) {}}
             typeGroup.setOnCheckedChangeListener { _, checkedId -> selectedTypePosition=checkedId;updateType() }
             ledger?.onItemSelectedListener=object:AdapterView.OnItemSelectedListener {override fun onItemSelected(parent:AdapterView<*>?,v:View?,position:Int,id:Long){rebuildLedgerOptions()};override fun onNothingSelected(parent:AdapterView<*>?) {}}
             rebuildLedgerOptions(edits?.optString("accountId") ?: item.optString("accountId"),edits?.optString("targetAccountId") ?: "",edits?.optString("categoryId") ?: item.optString("categoryId"))

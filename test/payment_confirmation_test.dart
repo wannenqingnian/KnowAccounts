@@ -97,6 +97,17 @@ void main() {
       expect(preview!['amount'], '16.00');
       expect(preview['accountId'], account);
       expect((preview['accounts'] as List).first, {'id': '', 'name': '请选择账户'});
+      final previewCategories = (preview['categories'] as List).cast<Map>();
+      final child = previewCategories.firstWhere(
+        (category) => category['parentId'] != null,
+      );
+      expect(child['parentId'], isNotEmpty);
+      expect(
+        previewCategories.firstWhere(
+          (category) => category['id'] == child['parentId'],
+        ).containsKey('parentId'),
+        false,
+      );
       final first = await confirmPayment(repo, command('a'));
       expect(first.ok, true, reason: first.message);
       expect((await confirmPayment(repo, command('a'))).ok, true);

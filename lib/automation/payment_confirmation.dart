@@ -66,7 +66,13 @@ Future<Map<String, Object?>?> paymentPreview(
     ];
     categoriesByLedger[ledgerId] = [
       for (final category in await repo.categories(ledgerId))
-        {'id': category.id, 'name': category.name, 'type': category.type.name},
+        {
+          'id': category.id,
+          'name': category.name,
+          'type': category.type.name,
+          if (category.parentId != null) 'parentId': category.parentId,
+          'iconKey': category.iconKey,
+        },
     ];
   }
   var parsed = TransactionParser().parse(
@@ -144,7 +150,13 @@ Future<Map<String, Object?>?> paymentPreview(
     ],
     'categories': [
       for (final c in categories)
-        {'id': c.id, 'name': c.name, 'type': c.type.name},
+        {
+          'id': c.id,
+          'name': c.name,
+          'type': c.type.name,
+          if (c.parentId != null) 'parentId': c.parentId,
+          'iconKey': c.iconKey,
+        },
     ],
   };
 }
