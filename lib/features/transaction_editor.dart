@@ -353,6 +353,17 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
 
   Future<void> _save() async {
     if (!_attachmentsReady || !_form.currentState!.validate()) return;
+    final missingSelections = [
+      if (_account == null) '请选择账户',
+      if ((_type == TransactionType.expense ||
+              _type == TransactionType.income) &&
+          _category == null)
+        '请选择分类',
+    ];
+    if (missingSelections.isNotEmpty) {
+      setState(() => _error = missingSelections.join('；'));
+      return;
+    }
     if (ref.read(ledgerProvider).ledgerId != _attachmentLedger) {
       setState(() => _error = "账本已变化，请重新打开记账表单");
       return;
@@ -492,6 +503,65 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
               .where((category) => category.parentId == selectedRoot.id)
               .toList();
     final visibleRoots = roots.take(9).toList();
+
+    Future<void> pickAccount() async {
+      final value = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('选择账户'),
+          children: state.accounts
+              .map(
+                (account) => SimpleDialogOption(
+                  onPressed: () => Navigator.pop(dialogContext, account.id),
+                  child: Text(account.displayName),
+                ),
+              )
+              .toList(),
+        ),
+      );
+      if (!mounted || value == null || value == _account) return;
+      final oldCurrency = selectedAccount?.currency;
+      final nextCurrency = state.accounts
+          .where((account) => account.id == value)
+          .firstOrNull
+          ?.currency;
+      setState(() {
+        _account = value;
+        _error = null;
+        if (oldCurrency != null &&
+            nextCurrency != null &&
+            oldCurrency != nextCurrency) {
+          _amount.clear();
+        }
+      });
+    }
+
+    Future<void> pickCategory() async {
+      final value = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('全部分类'),
+          children: categories.map((category) {
+            final parent = state.categories
+                .where((item) => item.id == category.parentId)
+                .firstOrNull;
+            return SimpleDialogOption(
+              onPressed: () => Navigator.pop(dialogContext, category.id),
+              child: Text(
+                parent == null
+                    ? category.name
+                    : '${parent.name} / ${category.name}',
+              ),
+            );
+          }).toList(),
+        ),
+      );
+      if (!mounted || value == null) return;
+      setState(() {
+        _category = value;
+        _error = null;
+      });
+    }
 
     Widget typeTab(TransactionType value, String label) {
       final selected = _type == value;
@@ -715,8 +785,11 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                             children: [
                               ...visibleRoots.map(categoryTile),
                               InkWell(
+                                key: const ValueKey(
+                                  'transaction_all_categories',
+                                ),
                                 borderRadius: BorderRadius.circular(18),
-                                onTap: () {},
+                                onTap: _saving ? null : pickCategory,
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -794,6 +867,11 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                               ],
                             ),
                           ],
+                          if (selectedCategory == null)
+                            Text(
+                              '请选择分类',
+                              style: TextStyle(color: colors.error),
+                            ),
                         ],
                         const SizedBox(height: 18),
                         Container(
@@ -871,14 +949,17 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                                   runSpacing: 6,
                                   children: [
                                     ActionChip(
+                                      key: const ValueKey(
+                                        'transaction_account_chip',
+                                      ),
                                       avatar: const Icon(
                                         Icons.account_balance_wallet_outlined,
                                         size: 17,
                                       ),
                                       label: Text(
-                                        selectedAccount?.displayName ?? '选择账户',
+                                        selectedAccount?.displayName ?? '请选择账户',
                                       ),
-                                      onPressed: null,
+                                      onPressed: _saving ? null : pickAccount,
                                     ),
                                     ActionChip(
                                       avatar: const Icon(
@@ -917,83 +998,9 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                             '更多信息',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
-                          subtitle: const Text('账户、分类、时间、标签、备注与附件'),
+                          subtitle: const Text('备注、标签、报销与附件'),
                           children: [
-                            if (_type == TransactionType.expense ||
-                                _type == TransactionType.income) ...[
-                              DropdownButtonFormField<String>(
-                                key: ValueKey(
-                                  'category_${_type.name}_$_category',
-                                ),
-                                initialValue: _category,
-                                decoration: const InputDecoration(
-                                  labelText: '全部分类',
-                                ),
-                                isExpanded: true,
-                                items: categories.map((category) {
-                                  final parent = state.categories
-                                      .where((p) => p.id == category.parentId)
-                                      .firstOrNull;
-                                  return DropdownMenuItem(
-                                    value: category.id,
-                                    child: Text(
-                                      parent == null
-                                          ? category.name
-                                          : '${parent.name} / ${category.name}',
-                                    ),
-                                  );
-                                }).toList(),
-                                onChanged: _saving
-                                    ? null
-                                    : (value) =>
-                                          setState(() => _category = value),
-                                validator: (value) =>
-                                    value == null ? '请选择分类' : null,
-                              ),
-                              const SizedBox(height: 12),
-                            ],
-                            DropdownButtonFormField<String>(
-                              key: ValueKey(
-                                'account_${state.ledgerId}_$_account',
-                              ),
-                              initialValue: _account,
-                              decoration: InputDecoration(
-                                labelText: _type == TransactionType.transfer
-                                    ? '转出账户'
-                                    : refund
-                                    ? '退款到账账户'
-                                    : '账户',
-                              ),
-                              items: state.accounts
-                                  .map(
-                                    (account) => DropdownMenuItem(
-                                      value: account.id,
-                                      child: Text(account.displayName),
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: _saving
-                                  ? null
-                                  : (value) => setState(() {
-                                      final old = selectedAccount?.currency;
-                                      _account = value;
-                                      final next = state.accounts
-                                          .where(
-                                            (account) => account.id == value,
-                                          )
-                                          .firstOrNull
-                                          ?.currency;
-                                      if (old != null &&
-                                          next != null &&
-                                          old != next) {
-                                        _amount.clear();
-                                      }
-                                    }),
-                              validator: (value) =>
-                                  value == null ? '请选择账户' : null,
-                            ),
                             if (_type == TransactionType.transfer) ...[
-                              const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
                                 key: ValueKey(
                                   'target_${state.ledgerId}_$_target',
@@ -1031,26 +1038,6 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                                   ),
                                 ),
                             ],
-                            const SizedBox(height: 12),
-                            OutlinedButton.icon(
-                              icon: const Icon(
-                                Icons.schedule_outlined,
-                                size: 18,
-                              ),
-                              label: Text(dateTimeLabel(_date)),
-                              onPressed: _saving
-                                  ? null
-                                  : () async {
-                                      final date =
-                                          await showSecondDateTimePicker(
-                                            context,
-                                            initial: _date,
-                                          );
-                                      if (date != null && mounted) {
-                                        setState(() => _date = date);
-                                      }
-                                    },
-                            ),
                             const SizedBox(height: 12),
                             TextFormField(
                               controller: _note,

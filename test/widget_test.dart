@@ -191,6 +191,60 @@ void main() {
     },
   );
 
+  testWidgets(
+    'manual transaction edits account and category from the summary',
+    (tester) async {
+      final db = AppDatabase.memory();
+      final repository = LedgerRepository(db);
+      await repository.initialize();
+      final accounts = await repository.accounts('personal');
+      final categories = await repository.categories('personal');
+      final replacementAccount = accounts[1];
+      final replacementCategory = categories.firstWhere(
+        (category) =>
+            category.type == TransactionType.expense &&
+            category.parentId != null,
+      );
+      tester.view.physicalSize = const Size(430, 932);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [repositoryProvider.overrideWithValue(repository)],
+          child: const SmartLedgerApp(),
+        ),
+      );
+      await tester.runAsync(
+        () async => Future<void>.delayed(const Duration(milliseconds: 150)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('记一笔'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('手动记账'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('全部分类'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('transaction_account_chip')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(replacementAccount.displayName).last);
+      await tester.pumpAndSettle();
+      expect(find.text(replacementAccount.displayName), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('transaction_all_categories')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining(replacementCategory.name).last);
+      await tester.pumpAndSettle();
+      expect(find.text(replacementCategory.name), findsOneWidget);
+      expect(find.text('账户、分类、时间、标签、备注与附件'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await db.close();
+    },
+  );
+
   testWidgets('manual transaction can switch ledger before saving', (
     tester,
   ) async {
