@@ -12,7 +12,7 @@
 
 **Work type:** Building / Problem-Solving
 
-**Status:** Nearing Completion
+**Status:** Complete
 
 ---
 
@@ -22,8 +22,8 @@
 
 ## Current State
 
-- 当前稳定版本仍为 `0.29.10+76`，Git 基线标签为 `v0.29.10`。
-- Material 3 UI 优化已实现，提交在包含本文档的 `main` 分支提交中；未创建新版本标签或 GitHub Release。
+- 当前稳定版本为 `0.29.11+77`，正式发布标签为 `v0.29.11`。
+- Material 3 UI 优化已实现并进入正式 Android ARM64 发布流程。
 - 现有绿色品牌色和用户可配置主题能力保留。界面优先使用 `ColorScheme` 语义色，深色模式不再依赖主要页面中的固定白色背景。
 - 手动记账、智能识别、OCR、账户、分析、回收站和语音等核心流程未改变。
 - 仓库中的 `android/gradle - 副本.properties`、`smart_ledger_src_v0.29.6.zip` 和本机生成的 `.flutter-plugins-dependencies` 不属于本次交付，不应提交。
@@ -47,7 +47,7 @@
 - **(user) 不修改业务逻辑、状态管理和 API。** 本次修改集中在主题、布局、组件样式和 Widget 测试。
 - **(user) 优先复用现有组件。** `SectionCard`、`EntryTile` 和 `EmptyView` 继续作为共享组件，只补充主题感知能力。
 - 保留五个一级导航目的地。项目恰好有总览、流水、账户、分析、管理五个入口，符合 Material 3 `NavigationBar` 的使用边界，无需新增抽屉或路由层。
-- 不在本次提交中升版本或发布 APK。用户本次只要求提交源码和交接文档；发布应在真机验收或明确要求后进行。
+- 正式版本号使用 `0.29.11+77`，延续 `0.29.10+76` 的补丁版本与构建号递增规则。
 
 ## Approaches That Did Not Work
 
@@ -58,7 +58,6 @@
 
 ## Open Discussions
 
-- **下一发布版本** — 尚未决定是否将本次 UI 优化发布为 `0.29.11`。需要先完成真机视觉验收，再决定版本号、Release Notes 和标签。
 - **截图 OCR 重试测试** — `capture_widget_test.dart` 中“模型已就绪后重试同一截图”用例曾在完整文件运行时找不到 `transaction_tags`；前三个截图流程通过，单独重跑又受 Windows 测试宿主偶发未完成影响，尚未形成稳定结论。
 - **维护页旧断言** — `maintenance_widget_test.dart` 仍期待旧文案“请选择可用项或先在管理中恢复”，而当前代码和 `v0.29.10` 基线文案为“请重新选择可用项”。这是已有测试与实现不一致，本次没有顺手修改。
 
@@ -74,8 +73,7 @@
 
 1. 在 Android 真机上检查 360–430px 屏幕、系统 100%/160% 字号、浅色/深色、键盘弹出、底部手势区域和横竖屏切换。
 2. 单独稳定复现并修复截图 OCR 重试测试；同步维护页断言与当前产品文案。
-3. 若真机验收通过，再将版本升至下一个版本，更新 `README.md` 与 `RELEASE_NOTES.md`。
-4. 推送与 `pubspec.yaml` 一致的版本标签，由 GitHub Actions 使用稳定签名构建并发布 Android ARM64 APK。
+3. 后续界面反馈应在 `0.29.11` 基线上修复，并按补丁版本继续发布。
 
 ## Key References
 
