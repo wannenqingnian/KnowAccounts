@@ -409,7 +409,10 @@ class _SmartInputSheetState extends ConsumerState<SmartInputSheet> {
                   onChanged: (_) => setState(() => _draft = null),
                 ),
                 const SizedBox(height: 8),
-                Row(
+                OverflowBar(
+                  spacing: 10,
+                  overflowSpacing: 8,
+                  alignment: MainAxisAlignment.end,
                   children: [
                     OutlinedButton.icon(
                       onPressed:
@@ -438,18 +441,15 @@ class _SmartInputSheetState extends ConsumerState<SmartInputSheet> {
                             : '说一句',
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: state.loading || _busy || _speechActive
-                            ? null
-                            : _parse,
-                        icon: const Icon(Icons.auto_awesome_outlined),
-                        label: Text(
-                          widget.source == TransactionSource.ocr
-                              ? '生成账单草稿'
-                              : '识别账单',
-                        ),
+                    FilledButton.icon(
+                      onPressed: state.loading || _busy || _speechActive
+                          ? null
+                          : _parse,
+                      icon: const Icon(Icons.auto_awesome_outlined),
+                      label: Text(
+                        widget.source == TransactionSource.ocr
+                            ? '生成账单草稿'
+                            : '识别账单',
                       ),
                     ),
                   ],
@@ -471,7 +471,13 @@ class _SmartInputSheetState extends ConsumerState<SmartInputSheet> {
                   ),
                 if (_busy || _startingSpeech || _recognizingSpeech)
                   const LinearProgressIndicator(),
-                if (_error != null) Text(_error!),
+                if (_error != null)
+                  Text(
+                    _error!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
                 if (draft != null) ...[
                   const SizedBox(height: 20),
                   Text(

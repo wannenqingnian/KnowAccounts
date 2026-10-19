@@ -24,7 +24,7 @@ Future<void> showTransactionEditor(
 }) => showModalBottomSheet<void>(
   context: context,
   isScrollControlled: true,
-  showDragHandle: false,
+  showDragHandle: true,
   useSafeArea: true,
   backgroundColor: Theme.of(context).colorScheme.surface,
   builder: (_) => TransactionEditor(
@@ -573,10 +573,17 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
             duration: const Duration(milliseconds: 160),
             padding: const EdgeInsets.symmetric(vertical: 11),
             decoration: BoxDecoration(
-              color: selected ? Colors.white : Colors.transparent,
+              color: selected
+                  ? colors.surfaceContainerLowest
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(14),
               boxShadow: selected
-                  ? const [BoxShadow(color: Color(0x12000000), blurRadius: 8)]
+                  ? [
+                      BoxShadow(
+                        color: colors.shadow.withValues(alpha: .08),
+                        blurRadius: 8,
+                      ),
+                    ]
                   : null,
             ),
             child: Text(
@@ -610,7 +617,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
               ),
               child: Icon(
                 _categoryIcon(category),
-                color: selected ? Colors.white : const Color(0xFF526177),
+                color: selected ? colors.onPrimary : muted,
               ),
             ),
             const SizedBox(height: 7),
@@ -619,7 +626,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: selected ? primary : const Color(0xFF526177),
+                color: selected ? primary : muted,
                 fontSize: 12,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
               ),
@@ -635,7 +642,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
         ? '记一笔'
         : '编辑账目';
     return SizedBox(
-      height: MediaQuery.sizeOf(context).height * .96,
+      height: MediaQuery.sizeOf(context).height * .92,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 720),
@@ -803,19 +810,13 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                                       child: SizedBox(
                                         width: 54,
                                         height: 54,
-                                        child: Icon(
-                                          Icons.tune,
-                                          color: Color(0xFF8A9AB0),
-                                        ),
+                                        child: Icon(Icons.tune, color: muted),
                                       ),
                                     ),
                                     const SizedBox(height: 7),
                                     const Text(
                                       '全部分类',
-                                      style: TextStyle(
-                                        color: Color(0xFF8A9AB0),
-                                        fontSize: 12,
-                                      ),
+                                      style: TextStyle(fontSize: 12),
                                     ),
                                   ],
                                 ),
@@ -827,12 +828,12 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                             Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Padding(
+                                Padding(
                                   padding: EdgeInsets.only(top: 7),
                                   child: Text(
                                     '二级子类：',
                                     style: TextStyle(
-                                      color: Color(0xFF91A0B5),
+                                      color: muted,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
@@ -850,8 +851,8 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                                             selectedColor: primary,
                                             labelStyle: TextStyle(
                                               color: _category == category.id
-                                                  ? Colors.white
-                                                  : const Color(0xFF526177),
+                                                  ? colors.onPrimary
+                                                  : muted,
                                             ),
                                             onSelected: _saving
                                                 ? null
@@ -877,8 +878,8 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                         Container(
                           padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: const Color(0xFFE8EDF4)),
+                            color: colors.surfaceContainerLowest,
+                            border: Border.all(color: colors.outlineVariant),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Column(

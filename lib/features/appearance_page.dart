@@ -209,22 +209,20 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
           ),
         ),
         const SizedBox(height: 20),
-        Row(
+        OverflowBar(
+          spacing: 10,
+          overflowSpacing: 8,
+          alignment: MainAxisAlignment.end,
           children: [
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _share,
-                icon: const Icon(Icons.ios_share_outlined),
-                label: const Text('复制分享码'),
-              ),
+            OutlinedButton.icon(
+              onPressed: _share,
+              icon: const Icon(Icons.ios_share_outlined),
+              label: const Text('复制分享码'),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _import,
-                icon: const Icon(Icons.content_paste),
-                label: const Text('导入主题'),
-              ),
+            OutlinedButton.icon(
+              onPressed: _import,
+              icon: const Icon(Icons.content_paste),
+              label: const Text('导入主题'),
             ),
           ],
         ),
@@ -254,15 +252,15 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
           borderRadius: BorderRadius.circular(24),
           onTap: () => onSelected(value),
           child: Container(
-            width: 42,
-            height: 42,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: Color(value),
               shape: BoxShape.circle,
               border: Border.all(
                 color: selected == value
                     ? Theme.of(context).colorScheme.onSurface
-                    : Colors.black12,
+                    : Theme.of(context).colorScheme.outlineVariant,
                 width: selected == value ? 3 : 1,
               ),
             ),

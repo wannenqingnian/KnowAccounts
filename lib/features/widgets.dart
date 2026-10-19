@@ -87,6 +87,8 @@ class EntryTile extends StatelessWidget {
   final Future<void> Function()? onDelete;
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final positive =
         entry.type == TransactionType.income ||
         entry.type == TransactionType.refund;
@@ -105,7 +107,8 @@ class EntryTile extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          color: (positive ? teal : orange).withValues(alpha: .09),
+          color: (positive ? colors.primary : colors.tertiaryContainer)
+              .withValues(alpha: positive ? .10 : .55),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
@@ -114,7 +117,7 @@ class EntryTile extends StatelessWidget {
               : positive
               ? Icons.south_west
               : categoryIcon(entry.categoryName),
-          color: positive ? teal : orange,
+          color: positive ? colors.primary : colors.onTertiaryContainer,
           size: 20,
         ),
       ),
@@ -122,13 +125,13 @@ class EntryTile extends StatelessWidget {
         title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        style: textTheme.titleSmall,
       ),
       subtitle: Text(
         '${entry.accountName} · ${entry.isReimbursement ? '报销到账' : typeLabel(entry.type)}${entry.currency == 'CNY' ? '' : ' · 折合${visibleMoney(context, entry.amountMinor)}'}${entry.reimbursable ? ' · ${entry.reimbursementStatus}' : ''}${entry.attachmentCount > 0 ? ' · 图片${entry.attachmentCount}' : ''}${entry.note.isNotEmpty ? ' · ${entry.note}' : ''}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 12, color: Color(0xFF77827E)),
+        style: textTheme.bodySmall,
       ),
       trailing: Text(
         '${transfer
@@ -137,7 +140,7 @@ class EntryTile extends StatelessWidget {
             ? '+'
             : '-'}${entry.currency == 'CNY' ? visibleMoney(context, entry.amountMinor) : visibleCurrencyMoney(context, entry.displayAmountMinor, symbol: entry.currencySymbol, decimals: entry.currencyDecimals)}',
         style: TextStyle(
-          color: positive ? teal : ink,
+          color: positive ? colors.primary : colors.onSurface,
           fontWeight: FontWeight.w700,
           fontSize: 15,
         ),
@@ -150,7 +153,7 @@ class EntryTile extends StatelessWidget {
         if (onEdit != null)
           SwipePaneAction(
             key: ValueKey('entry-edit-${entry.id}'),
-            color: teal,
+            color: colors.primary,
             icon: Icons.edit_outlined,
             label: '编辑',
             onPressed: onEdit!,
@@ -158,7 +161,7 @@ class EntryTile extends StatelessWidget {
         if (onDelete != null)
           SwipePaneAction(
             key: ValueKey('entry-delete-${entry.id}'),
-            color: const Color(0xFFC6534C),
+            color: colors.error,
             icon: Icons.delete_outline,
             label: '删除',
             onPressed: onDelete!,
@@ -273,7 +276,7 @@ class _SwipeActionPaneState extends State<SwipeActionPane> {
             },
             onHorizontalDragCancel: _close,
             child: Material(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surfaceContainerLowest,
               child: InkWell(
                 onTap: _isOpen ? _close : widget.onTap,
                 child: widget.child,
@@ -327,15 +330,18 @@ class SectionCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.white,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(24),
-      side: const BorderSide(color: Color(0xFFE7EBE5)),
-    ),
-    clipBehavior: Clip.antiAlias,
-    child: Padding(padding: padding, child: child),
-  );
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: colors.surfaceContainerLowest,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colors.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(padding: padding, child: child),
+    );
+  }
 }
 
 class EmptyView extends StatelessWidget {
@@ -343,32 +349,36 @@ class EmptyView extends StatelessWidget {
     super.key,
     required this.title,
     required this.description,
+    this.icon = Icons.auto_stories_outlined,
     this.action,
   });
   final String title;
   final String description;
+  final IconData icon;
   final Widget? action;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 12),
-    child: Center(
-      child: Column(
-        children: [
-          const Icon(Icons.auto_stories_outlined, size: 38, color: teal),
-          const SizedBox(height: 16),
-          Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 18),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            description,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.grey),
-          ),
-          if (action != null) ...[const SizedBox(height: 20), action!],
-        ],
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 12),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(icon, size: 38, color: theme.colorScheme.primary),
+            const SizedBox(height: 16),
+            Text(title, style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              description,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (action != null) ...[const SizedBox(height: 20), action!],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }

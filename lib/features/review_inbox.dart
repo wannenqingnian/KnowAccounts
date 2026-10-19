@@ -537,7 +537,13 @@ class _ReviewInboxState extends ConsumerState<ReviewInbox> {
   Widget _duplicateList(LedgerController state) {
     final groups = _duplicateGroups;
     if (groups == null) return const Center(child: CircularProgressIndicator());
-    if (groups.isEmpty) return const Center(child: Text('没有需要成组审核的重复候选'));
+    if (groups.isEmpty) {
+      return const EmptyView(
+        icon: Icons.rule_folder_outlined,
+        title: '没有重复候选',
+        description: '检测到可能重复的账单时会显示在这里。',
+      );
+    }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: groups.length,
@@ -585,7 +591,11 @@ class _ReviewInboxState extends ConsumerState<ReviewInbox> {
 
   Widget _pendingList(LedgerController state) {
     if (state.pendingDrafts.isEmpty) {
-      return const Center(child: Text('没有待确认账单'));
+      return const EmptyView(
+        icon: Icons.inbox_outlined,
+        title: '没有待确认账单',
+        description: '自动识别的账单会先在这里等待核对。',
+      );
     }
     return ListView.builder(
       padding: const EdgeInsets.all(16),
@@ -722,7 +732,13 @@ class _ReviewInboxState extends ConsumerState<ReviewInbox> {
   Widget _ignoredList() {
     final values = _ignored;
     if (values == null) return const Center(child: CircularProgressIndicator());
-    if (values.isEmpty) return const Center(child: Text('没有已忽略记录'));
+    if (values.isEmpty) {
+      return const EmptyView(
+        icon: Icons.visibility_off_outlined,
+        title: '没有已忽略记录',
+        description: '忽略的待处理账单可以在这里恢复。',
+      );
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [

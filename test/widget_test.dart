@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:smart_ledger/app_state.dart';
 import 'package:smart_ledger/core/database/app_database.dart';
 import 'package:smart_ledger/data/ledger_repository.dart';
+import 'package:smart_ledger/domain/appearance.dart';
 import 'package:smart_ledger/main.dart';
 import 'package:smart_ledger/domain/models.dart';
 import 'package:smart_ledger/domain/money.dart';
@@ -521,6 +522,7 @@ void main() {
         () async => Future<void>.delayed(const Duration(milliseconds: 150)),
       );
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       final a = (await repository.accounts('personal')).last;
       expect(a.bankId, 'cmb');
       expect(a.cardLast4, '1111');
@@ -601,10 +603,13 @@ void main() {
       final creditRow = find.byKey(ValueKey('account_row_${a.id}'));
       await tester.ensureVisible(creditRow);
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       await tester.tap(creditRow);
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       await tester.tap(find.text('记录还款'));
       await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       await tester.enterText(find.byType(TextFormField).first, '100');
       await tester.ensureVisible(find.text('保存账目'));
       await tester.tap(find.text('保存账目'));
@@ -650,11 +655,47 @@ void main() {
       expect(find.text('知账'), findsOneWidget);
       await tester.tap(find.text('账户'));
       await tester.pumpAndSettle();
-      expect(find.text('账户净余额'), findsOneWidget);
+      expect(find.text('净资产(元)'), findsOneWidget);
       expect(find.text('微信'), findsOneWidget);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await db.close();
     },
   );
+
+  testWidgets('small dark layout supports large system text', (tester) async {
+    final db = AppDatabase.memory();
+    final repository = LedgerRepository(db);
+    await repository.initialize();
+    await repository.setSetting(
+      'appearance_v1',
+      const AppearanceSettings(brightness: 'dark').encode(),
+    );
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 1.6;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [repositoryProvider.overrideWithValue(repository)],
+        child: const SmartLedgerApp(),
+      ),
+    );
+    await tester.runAsync(
+      () async => Future<void>.delayed(const Duration(milliseconds: 150)),
+    );
+    await tester.pumpAndSettle();
+    final context = tester.element(find.text('财务总览'));
+    expect(Theme.of(context).brightness, Brightness.dark);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('管理').last);
+    await tester.pumpAndSettle();
+    expect(find.text('账本管理'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+    await db.close();
+  });
 }

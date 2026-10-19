@@ -315,6 +315,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     int inCny(Account account) =>
         (account.balanceMinor * account.rateToCnyMicros + 500000) ~/ 1000000;
 
@@ -324,8 +325,9 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     final investmentAccounts = state.accounts
         .where((a) => !a.kind.isDebt && _isInvestmentAccount(a))
         .toList();
-    final creditDebtAccounts =
-        state.accounts.where((a) => a.kind.isDebt).toList();
+    final creditDebtAccounts = state.accounts
+        .where((a) => a.kind.isDebt)
+        .toList();
 
     final fundingAssets = state.allAccounts
         .where((a) => !a.kind.isDebt && !_isInvestmentAccount(a))
@@ -348,7 +350,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
 
     final debtTotal = state.allAccounts
         .where((a) => a.kind.isDebt)
-        .fold<int>(0, (s, a) => s + (a.balanceMinor < 0 ? -inCny(a) : inCny(a)));
+        .fold<int>(
+          0,
+          (s, a) => s + (a.balanceMinor < 0 ? -inCny(a) : inCny(a)),
+        );
 
     final receivableTotal = state.allAccounts
         .where(
@@ -375,17 +380,13 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
     final positiveFunding = state.allAccounts
         .where(
           (a) =>
-              !a.kind.isDebt &&
-              !_isInvestmentAccount(a) &&
-              a.balanceMinor > 0,
+              !a.kind.isDebt && !_isInvestmentAccount(a) && a.balanceMinor > 0,
         )
         .fold<int>(0, (s, a) => s + inCny(a));
     final positiveInvestment = state.allAccounts
         .where(
           (a) =>
-              !a.kind.isDebt &&
-              _isInvestmentAccount(a) &&
-              a.balanceMinor > 0,
+              !a.kind.isDebt && _isInvestmentAccount(a) && a.balanceMinor > 0,
         )
         .fold<int>(0, (s, a) => s + inCny(a));
 
@@ -408,8 +409,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                const Color(0xFFE2F0EA),
-                const Color(0xFFCCE8DD).withAlpha(220),
+                colors.primaryContainer,
+                colors.primaryContainer.withValues(alpha: .72),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -417,7 +418,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(10),
+                color: colors.shadow.withValues(alpha: .08),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -428,10 +429,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             children: [
               Row(
                 children: [
-                  const Text(
+                  Text(
                     '净资产(元)',
                     style: TextStyle(
-                      color: Color(0xFF4A6B5C),
+                      color: colors.onPrimaryContainer,
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                     ),
@@ -447,7 +448,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
                       size: 20,
-                      color: const Color(0xFF4A6B5C),
+                      color: colors.onPrimaryContainer,
                     ),
                     onPressed: () =>
                         state.setAmountPrivacy(!state.amountPrivacy),
@@ -459,19 +460,19 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
+                          Text(
                             '总资产 ',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF5A7B6C),
+                              color: colors.onPrimaryContainer,
                             ),
                           ),
                           Text(
                             visibleMoney(context, totalAssets, symbol: false),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1B382B),
+                              color: colors.onPrimaryContainer,
                             ),
                           ),
                         ],
@@ -480,11 +481,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text(
+                          Text(
                             '负资产 ',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF5A7B6C),
+                              color: colors.onPrimaryContainer,
                             ),
                           ),
                           Text(
@@ -493,10 +494,10 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                               totalLiabilities,
                               symbol: false,
                             ),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF1B382B),
+                              color: colors.onPrimaryContainer,
                             ),
                           ),
                         ],
@@ -512,8 +513,8 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                   fontSize: 32,
                   fontWeight: FontWeight.w800,
                   color: netAsset < 0
-                      ? const Color(0xFF2E7263)
-                      : const Color(0xFF1D5A46),
+                      ? colors.error
+                      : colors.onPrimaryContainer,
                 ),
               ),
             ],
@@ -530,9 +531,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                 borderRadius: BorderRadius.circular(14),
                 onTap: () => Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (_) => const ReimbursementPage(),
-                  ),
+                  MaterialPageRoute(builder: (_) => const ReimbursementPage()),
                 ),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -540,11 +539,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                     horizontal: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colors.surfaceContainerLowest,
                     borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withAlpha(8),
+                        color: colors.shadow.withValues(alpha: .06),
                         blurRadius: 6,
                         offset: const Offset(0, 2),
                       ),
@@ -552,57 +551,69 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                   ),
                   child: Column(
                     children: [
-                      const Text(
+                      Text(
                         '报销',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: ink,
+                          color: colors.onSurface,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            '可报: ',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          Text(
-                            visibleMoney(
-                              context,
-                              pendingReimbursement,
-                              symbol: false,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '可报: ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
+                              ),
                             ),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: ink,
+                            Text(
+                              visibleMoney(
+                                context,
+                                pendingReimbursement,
+                                symbol: false,
+                              ),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: colors.onSurface,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 3),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            '已报: ',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                          Text(
-                            visibleMoney(
-                              context,
-                              reimbursedTotal,
-                              symbol: false,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '已报: ',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: colors.onSurfaceVariant,
+                              ),
                             ),
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey,
+                            Text(
+                              visibleMoney(
+                                context,
+                                reimbursedTotal,
+                                symbol: false,
+                              ),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: colors.onSurfaceVariant,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -619,11 +630,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                   horizontal: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: colors.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha(8),
+                      color: colors.shadow.withValues(alpha: .06),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -631,55 +642,67 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                 ),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       '债务',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: ink,
+                        color: colors.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          '应付: ',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                        Text(
-                          visibleMoney(context, debtTotal, symbol: false),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: debtTotal > 0
-                                ? const Color(0xFFE57373)
-                                : ink,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '应付: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
-                        ),
-                      ],
+                          Text(
+                            visibleMoney(context, debtTotal, symbol: false),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: debtTotal > 0
+                                  ? colors.error
+                                  : colors.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 3),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          '应收: ',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                        Text(
-                          visibleMoney(
-                            context,
-                            receivableTotal,
-                            symbol: false,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '应收: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: teal,
+                          Text(
+                            visibleMoney(
+                              context,
+                              receivableTotal,
+                              symbol: false,
+                            ),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colors.primary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -695,11 +718,11 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                   horizontal: 10,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: colors.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha(8),
+                      color: colors.shadow.withValues(alpha: .06),
                       blurRadius: 6,
                       offset: const Offset(0, 2),
                     ),
@@ -707,57 +730,71 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
                 ),
                 child: Column(
                   children: [
-                    const Text(
+                    Text(
                       '理财',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: ink,
+                        color: colors.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          '总额: ',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                        Text(
-                          visibleMoney(
-                            context,
-                            investmentAssets,
-                            symbol: false,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '总额: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: ink,
+                          Text(
+                            visibleMoney(
+                              context,
+                              investmentAssets,
+                              symbol: false,
+                            ),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: colors.onSurface,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 3),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          '盈亏: ',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
-                        ),
-                        Text(
-                          visibleMoney(
-                            context,
-                            investmentProfit,
-                            symbol: false,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '盈亏: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colors.onSurfaceVariant,
+                            ),
                           ),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: investmentProfit >= 0 ? teal : orange,
+                          Text(
+                            visibleMoney(
+                              context,
+                              investmentProfit,
+                              symbol: false,
+                            ),
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: investmentProfit >= 0
+                                  ? colors.primary
+                                  : colors.error,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -903,11 +940,7 @@ class _AccountsPageState extends ConsumerState<AccountsPage> {
             color: bgColor,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(
-            iconData,
-            color: iconColor,
-            size: 20,
-          ),
+          child: Icon(iconData, color: iconColor, size: 20),
         ),
         title: Text(
           account.displayName,

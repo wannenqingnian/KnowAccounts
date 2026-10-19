@@ -11,7 +11,6 @@ import 'core/database/app_database.dart';
 import 'data/ledger_repository.dart';
 import 'features/home_shell.dart';
 import 'features/money_privacy.dart';
-import 'features/widgets.dart';
 import 'core/security/card_vault.dart';
 
 Future<void> main() async {
@@ -82,20 +81,57 @@ class SmartLedgerApp extends ConsumerWidget {
             ? const Color(0xFF111714)
             : Color(appearance.backgroundColor),
       );
-      return ThemeData(
+      final base = ThemeData(
         fontFamily: fontFamily ?? appearance.fontFamily,
         useMaterial3: true,
         colorScheme: scheme,
         scaffoldBackgroundColor: scheme.surface,
-        textTheme: TextTheme(
-          bodyMedium: TextStyle(color: dark ? scheme.onSurface : ink),
+        visualDensity: VisualDensity.standard,
+      );
+      final textTheme = base.textTheme.copyWith(
+        headlineSmall: base.textTheme.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: -.3,
         ),
+        titleLarge: base.textTheme.titleLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
+        titleMedium: base.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+        bodyLarge: base.textTheme.bodyLarge?.copyWith(height: 1.45),
+        bodyMedium: base.textTheme.bodyMedium?.copyWith(height: 1.45),
+        bodySmall: base.textTheme.bodySmall?.copyWith(
+          height: 1.4,
+          color: scheme.onSurfaceVariant,
+        ),
+        labelLarge: base.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+      );
+      return base.copyWith(
+        textTheme: textTheme,
         iconTheme: IconThemeData(
           fill: appearance.iconStyle == 'filled' ? 1 : 0,
+          color: scheme.onSurfaceVariant,
+        ),
+        appBarTheme: AppBarThemeData(
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          centerTitle: false,
+          backgroundColor: scheme.surface,
+          foregroundColor: scheme.onSurface,
+          titleTextStyle: textTheme.titleLarge?.copyWith(
+            color: scheme.onSurface,
+          ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: dark ? scheme.surfaceContainerHigh : Colors.white,
+          fillColor: scheme.surfaceContainerHighest,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 15,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(radius),
             borderSide: BorderSide(color: scheme.outlineVariant),
@@ -104,10 +140,22 @@ class SmartLedgerApp extends ConsumerWidget {
             borderRadius: BorderRadius.circular(radius),
             borderSide: BorderSide(color: scheme.outlineVariant),
           ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(radius),
+            borderSide: BorderSide(color: scheme.primary, width: 1.5),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(radius),
+            borderSide: BorderSide(color: scheme.error),
+          ),
         ),
         cardTheme: CardThemeData(
+          color: scheme.surfaceContainerLowest,
+          elevation: 0,
+          margin: EdgeInsets.zero,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius + 4),
+            side: BorderSide(color: scheme.outlineVariant),
           ),
         ),
         filledButtonTheme: FilledButtonThemeData(
@@ -117,11 +165,133 @@ class SmartLedgerApp extends ConsumerWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(radius),
             ),
+            minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: scheme.primary,
+            side: BorderSide(color: scheme.outlineVariant),
+            minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(radius),
+            ),
+          ),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(radius),
+            ),
+          ),
+        ),
+        iconButtonTheme: IconButtonThemeData(
+          style: IconButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(radius),
+            ),
+          ),
+        ),
+        floatingActionButtonTheme: FloatingActionButtonThemeData(
+          elevation: 1,
+          focusElevation: 2,
+          hoverElevation: 2,
+          highlightElevation: 2,
+          backgroundColor: scheme.primary,
+          foregroundColor: scheme.onPrimary,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius + 4),
           ),
         ),
         navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: dark ? scheme.surfaceContainer : Colors.white,
+          height: 72,
+          elevation: 0,
+          backgroundColor: scheme.surfaceContainerLowest,
           indicatorColor: scheme.primaryContainer,
+          labelTextStyle: WidgetStateProperty.resolveWith(
+            (states) => textTheme.labelMedium?.copyWith(
+              color: states.contains(WidgetState.selected)
+                  ? scheme.onSurface
+                  : scheme.onSurfaceVariant,
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w700
+                  : FontWeight.w500,
+            ),
+          ),
+        ),
+        navigationRailTheme: NavigationRailThemeData(
+          backgroundColor: scheme.surfaceContainerLowest,
+          indicatorColor: scheme.primaryContainer,
+          selectedIconTheme: IconThemeData(color: scheme.onPrimaryContainer),
+          selectedLabelTextStyle: textTheme.labelLarge?.copyWith(
+            color: scheme.primary,
+          ),
+        ),
+        listTileTheme: ListTileThemeData(
+          iconColor: scheme.onSurfaceVariant,
+          textColor: scheme.onSurface,
+          minTileHeight: 52,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+        ),
+        dividerTheme: DividerThemeData(
+          color: scheme.outlineVariant,
+          thickness: 1,
+          space: 24,
+        ),
+        chipTheme: base.chipTheme.copyWith(
+          side: BorderSide(color: scheme.outlineVariant),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        ),
+        dialogTheme: DialogThemeData(
+          backgroundColor: scheme.surfaceContainerHigh,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius + 8),
+          ),
+        ),
+        bottomSheetTheme: BottomSheetThemeData(
+          backgroundColor: scheme.surfaceContainerLow,
+          modalBackgroundColor: scheme.surfaceContainerLow,
+          surfaceTintColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(radius + 10),
+            ),
+          ),
+        ),
+        menuTheme: MenuThemeData(
+          style: MenuStyle(
+            backgroundColor: WidgetStatePropertyAll(
+              scheme.surfaceContainerHigh,
+            ),
+            surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+            elevation: const WidgetStatePropertyAll(3),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(radius + 2),
+              ),
+            ),
+          ),
+        ),
+        snackBarTheme: SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: scheme.inverseSurface,
+          contentTextStyle: textTheme.bodyMedium?.copyWith(
+            color: scheme.onInverseSurface,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(radius),
+          ),
         ),
       );
     }
@@ -132,7 +302,9 @@ class SmartLedgerApp extends ConsumerWidget {
         final media = MediaQuery.of(context);
         return MediaQuery(
           data: media.copyWith(
-            textScaler: TextScaler.linear(appearance.fontScale),
+            textScaler: TextScaler.linear(
+              (media.textScaler.scale(1) * appearance.fontScale).clamp(.8, 2),
+            ),
           ),
           child: MoneyPrivacy(
             hidden: ref.watch(ledgerProvider).amountPrivacy,

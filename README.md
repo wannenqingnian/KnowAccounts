@@ -97,5 +97,6 @@ docs/                  功能、设计与开发文档
 - [本地语音记账](docs/SPEECH.md)
 - [统一置信度引擎](docs/CONFIDENCE.md)
 - [备份、账户与维护说明](docs/MAINTENANCE.md)
+- [2026-10-19 Material 3 UI 交接](docs/2026-10-19-handoff-material3-ui.md)
 
 首次启动只创建空账本、默认账户和分类，不插入演示交易。自动记账在字段缺失、冲突、低置信或疑似重复时进入人工核对，不会为了提高自动入账率而静默保存不确定账单。

@@ -344,7 +344,10 @@ class _HomeShellState extends ConsumerState<HomeShell>
                   onTap: () => Navigator.pop(context, 'undoMerge'),
                 ),
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                leading: Icon(
+                  Icons.delete_outline,
+                  color: Theme.of(context).colorScheme.error,
+                ),
                 title: const Text('删除账目'),
                 subtitle: const Text('可在回收站恢复'),
                 onTap: () => Navigator.pop(context, 'delete'),
@@ -535,14 +538,6 @@ class _HomeShellState extends ConsumerState<HomeShell>
   }
 
   Widget _addMenuButton(bool wide, LedgerController state) => MenuAnchor(
-    style: MenuStyle(
-      backgroundColor: const WidgetStatePropertyAll(Colors.white),
-      elevation: const WidgetStatePropertyAll(5),
-      shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-      padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(vertical: 6)),
-    ),
     menuChildren: [
       MenuItemButton(
         leadingIcon: const Icon(Icons.edit_note_outlined),
@@ -575,19 +570,13 @@ class _HomeShellState extends ConsumerState<HomeShell>
     ],
     builder: (context, controller, child) => wide
         ? FloatingActionButton.extended(
-            elevation: 0,
             tooltip: '记一笔',
-            backgroundColor: teal,
-            foregroundColor: Colors.white,
             onPressed: controller.isOpen ? controller.close : controller.open,
             icon: const Icon(Icons.add),
             label: const Text('记一笔'),
           )
         : FloatingActionButton.small(
-            elevation: 0,
             tooltip: '记一笔',
-            backgroundColor: teal,
-            foregroundColor: Colors.white,
             onPressed: controller.isOpen ? controller.close : controller.open,
             child: const Icon(Icons.add),
           ),
@@ -626,30 +615,35 @@ class _HomeShellState extends ConsumerState<HomeShell>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(ledgerProvider);
-    final wide = MediaQuery.sizeOf(context).width >= 850;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final wide = MediaQuery.sizeOf(context).width >= 840;
     return Scaffold(
       body: SafeArea(
+        bottom: wide,
         child: Row(
           children: [
             if (wide)
               SizedBox(
                 width: 216,
                 child: Material(
-                  color: Colors.white,
+                  color: colors.surfaceContainerLowest,
                   child: Column(
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(24, 34, 24, 34),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 32, 24, 28),
                         child: Row(
                           children: [
-                            Icon(Icons.auto_stories, color: teal, size: 30),
-                            SizedBox(width: 12),
+                            Icon(
+                              Icons.auto_stories,
+                              color: colors.primary,
+                              size: 30,
+                            ),
+                            const SizedBox(width: 12),
                             Text(
                               '知账',
-                              style: TextStyle(
-                                color: ink,
-                                fontSize: 26,
-                                fontWeight: FontWeight.w800,
+                              style: theme.textTheme.headlineSmall?.copyWith(
+                                color: colors.onSurface,
                               ),
                             ),
                           ],
@@ -669,32 +663,43 @@ class _HomeShellState extends ConsumerState<HomeShell>
                           ),
                           child: ListTile(
                             selected: _tab == item.$1,
-                            selectedTileColor: const Color(0xFFEAF2E9),
+                            selectedTileColor: colors.primaryContainer,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
                             ),
                             leading: Icon(
                               item.$3,
-                              color: _tab == item.$1 ? teal : Colors.grey,
+                              color: _tab == item.$1
+                                  ? colors.onPrimaryContainer
+                                  : colors.onSurfaceVariant,
                             ),
-                            title: Text(item.$2),
+                            title: Text(
+                              item.$2,
+                              style: TextStyle(
+                                fontWeight: _tab == item.$1
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
                             onTap: () => setState(() => _tab = item.$1),
                           ),
                         ),
                       const Spacer(),
-                      const Padding(
-                        padding: EdgeInsets.all(24),
+                      Padding(
+                        padding: const EdgeInsets.all(24),
                         child: Row(
                           children: [
                             Icon(
                               Icons.cloud_off_outlined,
                               size: 16,
-                              color: teal,
+                              color: colors.primary,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
                               '离线记账 · 本地保存',
-                              style: TextStyle(fontSize: 12, color: teal),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.primary,
+                              ),
                             ),
                           ],
                         ),
@@ -716,39 +721,44 @@ class _HomeShellState extends ConsumerState<HomeShell>
                     child: Row(
                       children: [
                         if (!wide) ...[
-                          const Icon(Icons.auto_stories, color: teal),
+                          Icon(Icons.auto_stories, color: colors.primary),
                           const SizedBox(width: 8),
                         ],
                         Expanded(
                           child: Text(
                             ['财务总览', '全部流水', '我的账户', '收支分析', '账本管理'][_tab],
-                            style: const TextStyle(
-                              fontSize: 23,
-                              color: ink,
-                              fontWeight: FontWeight.w700,
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              color: colors.onSurface,
                             ),
                           ),
                         ),
                         if (state.ledgers.isNotEmpty)
-                          DropdownButton<String>(
-                            value: state.ledgerId,
-                            underline: const SizedBox(),
-                            items: state.ledgers.entries
-                                .map(
-                                  (e) => DropdownMenuItem(
-                                    value: e.key,
-                                    child: Text(
-                                      e.value,
-                                      overflow: TextOverflow.ellipsis,
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: wide ? 220 : 140,
+                            ),
+                            child: DropdownButton<String>(
+                              value: state.ledgerId,
+                              isExpanded: true,
+                              borderRadius: BorderRadius.circular(16),
+                              underline: const SizedBox(),
+                              items: state.ledgers.entries
+                                  .map(
+                                    (e) => DropdownMenuItem(
+                                      value: e.key,
+                                      child: Text(
+                                        e.value,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: state.loading
-                                ? null
-                                : (v) {
-                                    if (v != null) state.selectLedger(v);
-                                  },
+                                  )
+                                  .toList(),
+                              onChanged: state.loading
+                                  ? null
+                                  : (v) {
+                                      if (v != null) state.selectLedger(v);
+                                    },
+                            ),
                           ),
                       ],
                     ),
@@ -807,29 +817,39 @@ class _HomeShellState extends ConsumerState<HomeShell>
       ),
       bottomNavigationBar: wide
           ? null
-          : NavigationBar(
-              height: 66,
-              selectedIndex: _tab,
-              onDestinationSelected: (v) => setState(() => _tab = v),
-              destinations: const [
-                NavigationDestination(
-                  icon: Icon(Icons.grid_view_outlined),
-                  label: '总览',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.receipt_long_outlined),
-                  label: '流水',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.account_balance_wallet_outlined),
-                  label: '账户',
-                ),
-                NavigationDestination(
-                  icon: Icon(Icons.bar_chart_outlined),
-                  label: '分析',
-                ),
-                NavigationDestination(icon: Icon(Icons.tune), label: '管理'),
-              ],
+          : SafeArea(
+              top: false,
+              child: NavigationBar(
+                selectedIndex: _tab,
+                onDestinationSelected: (v) => setState(() => _tab = v),
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.grid_view_outlined),
+                    selectedIcon: Icon(Icons.grid_view_rounded),
+                    label: '总览',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.receipt_long_outlined),
+                    selectedIcon: Icon(Icons.receipt_long),
+                    label: '流水',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.account_balance_wallet_outlined),
+                    selectedIcon: Icon(Icons.account_balance_wallet),
+                    label: '账户',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.bar_chart_outlined),
+                    selectedIcon: Icon(Icons.bar_chart),
+                    label: '分析',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.tune_outlined),
+                    selectedIcon: Icon(Icons.tune),
+                    label: '管理',
+                  ),
+                ],
+              ),
             ),
       floatingActionButton: state.summary == null
           ? null
@@ -838,6 +858,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
   }
 
   Widget _overview(LedgerController state) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final summary = state.summary!;
     final recent = state.entries
         .where(
@@ -857,7 +879,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
             child: ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.inbox_outlined, color: teal),
+              leading: Icon(Icons.inbox_outlined, color: colors.primary),
               title: Text('待确认账单 · ${state.pendingDrafts.length}'),
               subtitle: const Text('确认后才计入余额和统计'),
               trailing: const Icon(Icons.chevron_right),
@@ -890,14 +912,14 @@ class _HomeShellState extends ConsumerState<HomeShell>
                           '${state.month.year} 年 ${state.month.month} 月',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: Color(0xFF6D7C73)),
+                          style: TextStyle(color: colors.onSurfaceVariant),
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(
+                      Icon(
                         Icons.expand_more,
                         size: 18,
-                        color: Color(0xFF6D7C73),
+                        color: colors.onSurfaceVariant,
                       ),
                     ],
                   ),
@@ -916,9 +938,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
               onPressed: state.loading ? null : () => state.changeMonth(1),
               icon: const Icon(Icons.chevron_right),
             ),
-            const Icon(Icons.shield_outlined, size: 15, color: teal),
+            Icon(Icons.shield_outlined, size: 15, color: colors.primary),
             const SizedBox(width: 5),
-            const Text('本地保存', style: TextStyle(fontSize: 12, color: teal)),
+            Text('本地保存', style: TextStyle(fontSize: 12, color: colors.primary)),
           ],
         ),
         const SizedBox(height: 6),
@@ -926,22 +948,25 @@ class _HomeShellState extends ConsumerState<HomeShell>
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
           decoration: BoxDecoration(
-            color: ink,
+            color: colors.primary,
             borderRadius: BorderRadius.circular(22),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 '本月消费净额',
-                style: TextStyle(color: Color(0xFFBFD4C8), fontSize: 14),
+                style: TextStyle(
+                  color: colors.onPrimary.withValues(alpha: .8),
+                  fontSize: 14,
+                ),
               ),
               const SizedBox(height: 4),
               FittedBox(
                 child: Text(
                   visibleMoney(context, summary.expenseMinor),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: colors.onPrimary,
                     fontSize: 36,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -1,
@@ -988,9 +1013,12 @@ class _HomeShellState extends ConsumerState<HomeShell>
                           ),
                         ),
                         if (state.budgets.isEmpty)
-                          const Text(
+                          Text(
                             '设置总额或分类预算，可按月、季、年结转',
-                            style: TextStyle(color: Colors.grey, fontSize: 12),
+                            style: TextStyle(
+                              color: colors.onSurfaceVariant,
+                              fontSize: 12,
+                            ),
                           ),
                       ],
                     ),
@@ -1011,15 +1039,15 @@ class _HomeShellState extends ConsumerState<HomeShell>
                       vertical: 7,
                     ),
                     decoration: BoxDecoration(
-                      color: orange.withValues(alpha: .10),
+                      color: colors.tertiaryContainer,
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
                       state.budgets.any((value) => value.exceeded)
                           ? '预算超支，请查看预算明细'
                           : '预算已接近提醒比例',
-                      style: const TextStyle(
-                        color: orange,
+                      style: TextStyle(
+                        color: colors.onTertiaryContainer,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1038,7 +1066,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
                       Text(
                         '剩余 ${visibleMoney(context, budget.remainingMinor)}',
                         style: TextStyle(
-                          color: budget.exceeded ? orange : ink,
+                          color: budget.exceeded
+                              ? colors.error
+                              : colors.onSurface,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -1049,8 +1079,10 @@ class _HomeShellState extends ConsumerState<HomeShell>
                   LinearProgressIndicator(
                     value: MoneyPrivacy.of(context) ? 0 : budget.progress,
                     minHeight: 5,
-                    color: budget.exceeded || budget.warning ? orange : teal,
-                    backgroundColor: const Color(0xFFECF1E8),
+                    color: budget.exceeded || budget.warning
+                        ? colors.tertiary
+                        : colors.primary,
+                    backgroundColor: colors.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   const SizedBox(height: 7),
@@ -1088,7 +1120,7 @@ class _HomeShellState extends ConsumerState<HomeShell>
                                 Icon(
                                   categoryIcon(group.key),
                                   size: 18,
-                                  color: teal,
+                                  color: colors.primary,
                                 ),
                                 const SizedBox(width: 10),
                                 Expanded(child: Text(group.key)),
@@ -1110,8 +1142,8 @@ class _HomeShellState extends ConsumerState<HomeShell>
                                       1,
                                     )
                                   : 0,
-                              color: teal,
-                              backgroundColor: const Color(0xFFECF1E8),
+                              color: colors.primary,
+                              backgroundColor: colors.surfaceContainerHighest,
                             ),
                           ],
                         ),
@@ -1180,36 +1212,43 @@ class _HomeShellState extends ConsumerState<HomeShell>
           },
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           '消费净额 = 支出 − 当月到账退款；转账不计入收支。',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
+          style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
         ),
       ],
     );
   }
 
-  Widget _metric(String label, String value) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: const TextStyle(color: Color(0xFFBFD4C8), fontSize: 12),
-      ),
-      const SizedBox(height: 6),
-      FittedBox(
-        child: Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 21,
-            fontWeight: FontWeight.w600,
+  Widget _metric(String label, String value) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: colors.onPrimary.withValues(alpha: .8),
+            fontSize: 12,
           ),
         ),
-      ),
-    ],
-  );
+        const SizedBox(height: 6),
+        FittedBox(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: colors.onPrimary,
+              fontSize: 21,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _transactions(LedgerController state) {
+    final colors = Theme.of(context).colorScheme;
     final query = _search.text.trim().toLowerCase();
     final entries = state.entries
         .where(
@@ -1275,11 +1314,14 @@ class _HomeShellState extends ConsumerState<HomeShell>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Align(
+                Align(
                   alignment: Alignment.centerRight,
                   child: Text(
                     '左滑显示编辑与删除',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSurfaceVariant,
+                    ),
                   ),
                 ),
                 for (final entry in entries) ...[
@@ -1288,9 +1330,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
                       padding: const EdgeInsets.only(top: 8, bottom: 2),
                       child: Text(
                         previousDate = dateKey(entry.occurredDate),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Colors.grey,
+                          color: colors.onSurfaceVariant,
                         ),
                       ),
                     ),
