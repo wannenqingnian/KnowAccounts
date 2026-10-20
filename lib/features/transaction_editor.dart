@@ -14,6 +14,7 @@ import '../transaction/transaction_pipeline.dart';
 import 'date_time_picker.dart';
 import '../theme/transaction_colors.dart';
 import '../core/logging/app_logger.dart';
+import 'transaction_location.dart';
 
 Future<void> showTransactionEditor(
   BuildContext context, {
@@ -79,6 +80,10 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
   String? _target;
   String? _category;
   bool _reimbursable = false;
+  String? _location;
+  String? _locationError;
+  bool _locating = false;
+  int _locationRequest = 0;
   late bool _isReimbursement;
   List<ImageAttachment> _attachments = [];
   bool _attachmentsReady = true;
@@ -160,7 +165,14 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
           template?.merchant ??
           '',
     );
-    _note = TextEditingController(text: entry?.note ?? template?.note ?? '');
+    final initialNote = entry?.note ?? template?.note ?? '';
+    final initialLocation = transactionLocationFromNote(initialNote);
+    _location = entry == null ? null : initialLocation;
+    _note = TextEditingController(
+      text: initialLocation == null
+          ? initialNote
+          : transactionNoteWithoutLocation(initialNote),
+    );
     _tags = TextEditingController(
       text:
           entry?.tags.join('，') ??
@@ -355,7 +367,32 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
     super.dispose();
   }
 
+  Future<void> _setLocation(bool enabled) async {
+    final request = ++_locationRequest;
+    setState(() {
+      _location = null;
+      _locationError = null;
+      _locating = enabled;
+    });
+    if (!enabled) return;
+    try {
+      final location = await currentTransactionLocation();
+      if (mounted && request == _locationRequest) {
+        setState(() => _location = location);
+      }
+    } catch (_) {
+      if (mounted && request == _locationRequest) {
+        setState(() => _locationError = '未获取到地点，请检查系统定位与权限后重试；仍可直接记账。');
+      }
+    } finally {
+      if (mounted && request == _locationRequest) {
+        setState(() => _locating = false);
+      }
+    }
+  }
+
   Future<void> _save() async {
+    if (_saving || _locating) return;
     if (!_attachmentsReady || !_form.currentState!.validate()) {
       unawaited(
         AppLogger.instance.warning(
@@ -409,7 +446,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
       categoryId: _category,
       occurredDate: _date,
       merchant: _merchant.text,
-      note: _note.text,
+      note: transactionNoteWithLocation(_note.text, _location),
       tags: parseTagInput(_tags.text),
       reimbursable: _reimbursable,
       isReimbursement: _isReimbursement,
@@ -1025,7 +1062,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                             '更多信息',
                             style: TextStyle(fontWeight: FontWeight.w700),
                           ),
-                          subtitle: const Text('备注、标签、报销与附件'),
+                          subtitle: const Text('备注、地点、标签、报销与附件'),
                           children: [
                             if (_type == TransactionType.transfer) ...[
                               DropdownButtonFormField<String>(
@@ -1074,6 +1111,20 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                                 labelText: '备注（选填）',
                                 counterText: '',
                               ),
+                            ),
+                            SwitchListTile.adaptive(
+                              key: const ValueKey('transaction_location'),
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text('添加记账地点'),
+                              subtitle: Text(
+                                _locating
+                                    ? '正在获取系统位置，可关闭取消添加'
+                                    : _location ??
+                                          _locationError ??
+                                          '仅本次定位，保存当前位置坐标到备注',
+                              ),
+                              value: _locating || _location != null,
+                              onChanged: _saving ? null : _setLocation,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
@@ -1135,7 +1186,8 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton.icon(
-                            onPressed: _saving || !_attachmentsReady
+                            onPressed:
+                                _saving || _locating || !_attachmentsReady
                                 ? null
                                 : _save,
                             icon: _saving

@@ -494,22 +494,47 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
               children: [
                 Card(
                   margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: SwitchListTile.adaptive(
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                    secondary: Icon(
-                      report.enabled
-                          ? Icons.receipt_long_outlined
-                          : Icons.receipt_long,
-                    ),
-                    title: Text(report.enabled ? '日志记录已开启' : '日志记录已关闭'),
-                    subtitle: const Text('自动记账保留48小时/400条 · 应用日志保留14天/1000条'),
-                    value: report.enabled,
-                    onChanged: (value) => _action(
-                      () => ref
-                          .read(automationBridgeProvider)
-                          .setDiagnosticsEnabled(value),
-                    ),
+                  child: Column(
+                    children: [
+                      SwitchListTile.adaptive(
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        secondary: Icon(
+                          report.enabled
+                              ? Icons.receipt_long_outlined
+                              : Icons.receipt_long,
+                        ),
+                        title: Text(report.enabled ? '日志记录已开启' : '日志记录已关闭'),
+                        subtitle: const Text(
+                          '自动记账保留48小时/400条 · 应用日志保留14天/1000条',
+                        ),
+                        value: report.enabled,
+                        onChanged: (value) => _action(
+                          () => ref
+                              .read(automationBridgeProvider)
+                              .setDiagnosticsEnabled(value),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      SwitchListTile.adaptive(
+                        key: const ValueKey('sensitiveLogging'),
+                        dense: true,
+                        visualDensity: VisualDensity.compact,
+                        secondary: const Icon(Icons.privacy_tip_outlined),
+                        title: const Text('允许日志记录敏感信息'),
+                        subtitle: const Text('开启后日志会保存金额、商户和付款账户；关闭会立即脱敏已有日志'),
+                        value: report.state['sensitiveLogging'] == true,
+                        onChanged:
+                            report.enabled ||
+                                report.state['sensitiveLogging'] == true
+                            ? (value) => _action(
+                                () => ref
+                                    .read(automationBridgeProvider)
+                                    .setDiagnosticsSensitive(value),
+                              )
+                            : null,
+                      ),
+                    ],
                   ),
                 ),
                 ExpansionTile(
@@ -810,6 +835,17 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                    if (event.recognizedText.isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        event.recognizedText,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodySmall,
+                                      ),
+                                    ],
                                     const SizedBox(height: 3),
                                     Text(
                                       '${time.toIso8601String().replaceFirst("T", " ")} · ${event.origin}',
@@ -839,6 +875,16 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
                                       title: '建议操作',
                                       text: explanation.action,
                                       color: Colors.orange.shade800,
+                                    ),
+                                  if (event.recognizedText.isNotEmpty)
+                                    _DiagnosticDetail(
+                                      icon: Icons.visibility_outlined,
+                                      title:
+                                          report.state['sensitiveLogging'] ==
+                                              true
+                                          ? '识别摘要（含敏感信息）'
+                                          : '脱敏识别摘要',
+                                      text: event.recognizedText,
                                     ),
                                   _DiagnosticDetail(
                                     icon: Icons.code,

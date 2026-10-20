@@ -26,6 +26,8 @@ class AutomationBridge {
   Future<void> clearDiagnostics() => channel.invokeMethod('clearDiagnostics');
   Future<void> setDiagnosticsEnabled(bool enabled) =>
       channel.invokeMethod('setDiagnosticsEnabled', {'enabled': enabled});
+  Future<void> setDiagnosticsSensitive(bool enabled) =>
+      channel.invokeMethod('setDiagnosticsSensitive', {'enabled': enabled});
   Future<void> retry() => channel.invokeMethod('retry');
   void listen(Future<void> Function() updated) =>
       channel.setMethodCallHandler((call) async {

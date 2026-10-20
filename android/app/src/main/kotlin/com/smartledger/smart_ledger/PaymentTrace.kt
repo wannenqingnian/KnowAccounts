@@ -13,6 +13,21 @@ object PaymentTrace {
     fun setEnabled(c: Context, enabled: Boolean) {
         prefs(c).edit().putBoolean("enabled", enabled).apply()
     }
+    fun sensitive(c: Context) = prefs(c).getBoolean("sensitive", false)
+    @Synchronized fun setSensitive(c: Context, enabled: Boolean) {
+        val storage = prefs(c)
+        if (enabled) {
+            storage.edit().putBoolean("sensitive", true).apply()
+            return
+        }
+        val rows = stored(c)
+        for (i in 0 until rows.length()) {
+            val fields = rows.optJSONObject(i)?.optJSONObject("fields") ?: continue
+            val safe = PaymentTracePolicy.fields(fields.keys().asSequence().associateWith { fields.optString(it) })
+            rows.getJSONObject(i).put("fields", JSONObject(safe))
+        }
+        storage.edit().putBoolean("sensitive", false).putString("rows", rows.toString()).apply()
+    }
     @Synchronized fun clear(c: Context) { prefs(c).edit().remove("rows").apply() }
     private fun stored(c: Context): JSONArray = try { JSONArray(prefs(c).getString("rows","[]")) } catch (_: Exception) { JSONArray() }
     @Synchronized fun event(c: Context, code: String, pkg: String="", kind: String="", ref: String="", count: Int=0, fields: Map<*, *>?=null) {
@@ -26,7 +41,7 @@ object PaymentTrace {
                 if(PaymentTracePolicy.retained(item.optLong("time"),now)) rows.put(item)
             }
             val app=pkg.takeIf { it in PaymentCaptureGuard.packages || it == PaymentAutomation.MANUAL_OCR_PACKAGE } ?: ""
-            val source=PaymentTracePolicy.source(kind); val reference=PaymentTracePolicy.reference(ref); val recognized=PaymentTracePolicy.fields(fields)
+            val source=PaymentTracePolicy.source(kind); val reference=PaymentTracePolicy.reference(ref); val recognized=PaymentTracePolicy.fields(fields,sensitive(c))
             val last=if(rows.length()>0) rows.optJSONObject(rows.length()-1) else null
             if(last!=null && last.optString("code")==code && last.optString("app")==app && last.optString("source")==source && last.optString("ref")==reference && last.optJSONObject("fields")?.toString()==JSONObject(recognized).toString() && now-last.optLong("time")<3000) {
                 last.put("time",now).put("repeats",minOf(999999,last.optInt("repeats",1)+1)).put("count",count.coerceIn(0,1000000))
@@ -43,7 +58,7 @@ object PaymentTrace {
             val code=row.optString("code")
             if(code !in PaymentTracePolicy.codes || !PaymentTracePolicy.retained(row.optLong("time"),now)) continue
             val fields=row.optJSONObject("fields")
-            val recognized=PaymentTracePolicy.fields(fields?.let { json -> json.keys().asSequence().associateWith { json.optString(it) } })
+            val recognized=PaymentTracePolicy.fields(fields?.let { json -> json.keys().asSequence().associateWith { json.optString(it) } },sensitive(c))
             events.add(mapOf("time" to row.optLong("time"),"code" to code,
                 "app" to (row.optString("app").takeIf { it in PaymentCaptureGuard.packages || it == PaymentAutomation.MANUAL_OCR_PACKAGE } ?: ""),
                 "source" to PaymentTracePolicy.source(row.optString("source")),
@@ -53,7 +68,7 @@ object PaymentTrace {
         val status=PaymentAutomation.status(c);val config=PaymentAutomation.config(c)
         val keys=listOf("notificationsGranted","accessibilityGranted","notificationConnected","accessibilityConnected","workerRunning","overlayGranted","overlayVisible","ocrModelReady","queued","error","errorCode")
         val state=keys.associateWith {status[it]}.toMutableMap()
-        state["enabled"]=config.optBoolean("enabled");state["enhanced"]=config.optBoolean("enhanced");state["reviewPopup"]=config.optBoolean("reviewPopup",true)
+        state["enabled"]=config.optBoolean("enabled");state["enhanced"]=config.optBoolean("enhanced");state["reviewPopup"]=config.optBoolean("reviewPopup",true);state["sensitiveLogging"]=sensitive(c)
         state["screenshotFallback"]=config.optBoolean("enhanced") && status["ocrModelReady"] == true
         state["wechatEnabled"]=config.optJSONObject("apps")?.optJSONObject("com.tencent.mm")?.optBoolean("enabled") == true
         state["batteryExempt"]=(c.getSystemService(Context.POWER_SERVICE) as PowerManager).isIgnoringBatteryOptimizations(c.packageName)

@@ -1,7 +1,7 @@
 name: smart_ledger
 description: Offline-first intelligent bookkeeping app.
 publish_to: none
-version: 0.29.12+78
+version: 0.29.13+79
 environment:
   sdk: '>=3.8.0 <4.0.0'
 dependencies:
@@ -21,6 +21,7 @@ dependencies:
   excel: ^4.0.6
   fast_gbk: ^1.0.0
   flutter_secure_storage: ^9.2.4
+  geolocator: ^14.0.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

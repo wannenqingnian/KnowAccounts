@@ -21,6 +21,7 @@ Map<String, dynamic> event(String code, String app, String source, int time) =>
 
 class LogBridge extends AutomationBridge {
   bool logging = true;
+  bool sensitive = false;
   int cleared = 0, configs = 0;
   List<Map<String, dynamic>> events = [
     event('money_missing', 'com.tencent.mm', 'accessibility', 1000),
@@ -32,7 +33,7 @@ class LogBridge extends AutomationBridge {
     'enabled': logging,
     'appVersion': '0.14.1',
     'androidApi': 36,
-    'state': {'enabled': true},
+    'state': {'enabled': true, 'sensitiveLogging': sensitive},
     'events': events,
   };
   @override
@@ -47,14 +48,37 @@ class LogBridge extends AutomationBridge {
   }
 
   @override
+  Future<void> setDiagnosticsSensitive(bool enabled) async {
+    sensitive = enabled;
+  }
+
+  @override
   Future<void> configure(AutomationConfig config) async {
     configs++;
   }
 }
 
 void main() {
+  test('sensitive diagnostics default to masked fields without amounts', () {
+    final report = AutomationDiagnostics.fromJson({
+      'events': [
+        {
+          ...event('matched', 'com.tencent.mm', 'accessibility', 1000),
+          'fields': {
+            'amount': '3.00',
+            'merchant': '三津实业',
+            'account': '招商银行储蓄卡（1234）',
+          },
+        },
+      ],
+    });
+    expect(report.events.single.recognizedText, '商户 三**业 · 账户 招********1234');
+    expect(report.text(), isNot(contains('3.00')));
+    expect(report.text(), isNot(contains('招商银行')));
+  });
+
   test(
-    'display and export drop sensitive and unexpected bridge payload fields',
+    'consented recognized fields are shown but unexpected payloads are dropped',
     () {
       const secret = '4111111111111111私密商户聊天原文';
       final report = AutomationDiagnostics.fromJson({
@@ -65,6 +89,7 @@ void main() {
           'errorCode': secret,
           'queued': 10000,
           'enabled': true,
+          'sensitiveLogging': true,
           'card': secret,
         },
         'events': [
@@ -85,8 +110,12 @@ void main() {
       });
       expect(report.text(), isNot(contains(secret)));
       expect(report.text(), contains('金额 3.00'));
-      expect(report.text(), contains('商户 三**********司'));
-      expect(report.text(), contains('账户 招******1234'));
+      expect(report.text(), contains('商户 三津实业（深圳）有限公司'));
+      expect(report.text(), contains('账户 招商银行信用卡1234'));
+      expect(
+        report.events.last.recognizedText,
+        '金额 3.00 · 商户 三津实业（深圳）有限公司 · 账户 招商银行信用卡1234',
+      );
       expect(report.events.length, 2);
       expect(report.events.first.code, 'worker_ready');
       expect(report.events.first.reference, isEmpty);
@@ -248,7 +277,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(clipboard, contains('money_missing'));
       expect(clipboard, contains('matched'));
-      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(find.byType(SwitchListTile).first);
       await tester.pumpAndSettle();
       expect(bridge.logging, false);
       expect(find.text('日志记录已关闭'), findsOneWidget);
@@ -270,9 +299,18 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final bridge = LogBridge()
       ..events = [
-        event('money_missing', 'com.tencent.mm', 'accessibility', 1000),
+        {
+          ...event('money_missing', 'com.tencent.mm', 'accessibility', 1000),
+          'fields': {'amount': '3.00', 'account': '招********1234'},
+        },
       ];
     final appLogger = AppLogger.memory();
+    expect(
+      AutomationDiagnostics.fromJson(
+        await bridge.diagnostics(),
+      ).events.single.recognizedText,
+      '账户 招********1234',
+    );
     await tester.pumpWidget(
       ProviderScope(
         overrides: [automationBridgeProvider.overrideWithValue(bridge)],
@@ -296,6 +334,20 @@ void main() {
     expect(find.textContaining('实际结果'), findsWidgets);
     expect(find.textContaining('建议操作'), findsWidgets);
     expect(find.textContaining('实付金额'), findsWidgets);
+    expect(find.textContaining('识别摘要', findRichText: true), findsWidgets);
+    expect(find.text('账户 招********1234'), findsWidgets);
+    await tester.ensureVisible(find.byKey(const ValueKey('sensitiveLogging')));
+    await tester.tap(find.byKey(const ValueKey('sensitiveLogging')));
+    await tester.pumpAndSettle();
+    expect(bridge.sensitive, isTrue);
+    expect(find.text('金额 3.00 · 账户 招********1234'), findsWidgets);
+    await tester.tap(find.byType(SwitchListTile).first);
+    await tester.pumpAndSettle();
+    expect(bridge.logging, isFalse);
+    await tester.tap(find.byKey(const ValueKey('sensitiveLogging')));
+    await tester.pumpAndSettle();
+    expect(bridge.sensitive, isFalse);
+    expect(find.text('金额 3.00 · 账户 招********1234'), findsNothing);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

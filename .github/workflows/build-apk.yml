@@ -47,6 +47,16 @@ jobs:
       - name: Fetch Flutter dependencies
         run: flutter pub get
 
+      - name: Verify diagnostics and location regressions
+        run: |
+          flutter test --no-pub --concurrency=1 test/automation_diagnostics_test.dart
+          flutter test --no-pub test/transaction_location_test.dart
+          flutter test --no-pub test/ocr_manual_test.dart
+
+      - name: Verify Android diagnostic privacy policy
+        working-directory: android
+        run: ./gradlew -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.accessibilityReceiptProducesUsefulMaskedDiagnosticFields --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.recognizedFieldsAreAllowlistedAndMasked
+
       - name: Restore Android signing key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

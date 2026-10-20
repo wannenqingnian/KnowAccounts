@@ -55,10 +55,10 @@ object PaymentAutomation {
     }
     private fun queued(c: Context): JSONArray = try { JSONArray(prefs(c).getString("queue", "[]")) } catch (_: Exception) { JSONArray() }
     private fun writeQueue(c: Context, q: JSONArray) { check(prefs(c).edit().putString("queue", q.toString()).commit()) }
-    /** Diagnostics retain only stage/reason/app, never notification or page text. */
-    fun record(c: Context, pkg: String, kind: String, reason: String) {
+    /** Recognized fields follow the user's privacy setting; raw page text is never retained. */
+    fun record(c: Context, pkg: String, kind: String, reason: String, fields: Map<String, String>? = null) {
         if (!permitted(c, pkg, kind)) return
-        PaymentTrace.event(c,reason,pkg,kind)
+        PaymentTrace.event(c,reason,pkg,kind,fields=fields)
         val p = prefs(c)
         p.edit().putInt("sourceEvents", minOf(Int.MAX_VALUE - 1, p.getInt("sourceEvents", 0)) + 1)
             .putString("lastSource", pkg).putString("lastKind", kind).putString("lastReason", reason)
@@ -105,6 +105,7 @@ object PaymentAutomation {
                     "diagnostics" -> { check(foreground); result.success(PaymentTrace.report(context)) }
                     "clearDiagnostics" -> { check(foreground); PaymentTrace.clear(context); result.success(null) }
                     "setDiagnosticsEnabled" -> { check(foreground); PaymentTrace.setEnabled(context,call.argument<Boolean>("enabled")==true); result.success(null) }
+                    "setDiagnosticsSensitive" -> { check(foreground); PaymentTrace.setSensitive(context,call.argument<Boolean>("enabled")==true); result.success(null) }
                     "workerTrace" -> {
                         check(!foreground)
                         PaymentTrace.event(context,call.argument<String>("code") ?: "",call.argument<String>("app") ?: "",call.argument<String>("source") ?: "",call.argument<String>("id") ?: "",call.argument<Int>("count") ?: 0)
@@ -228,9 +229,10 @@ object PaymentAutomation {
     @Synchronized fun enqueue(c: Context, packageName: String, kind: String, text: String, capturedAt: Long, identity: String) {
         if (!permitted(c, packageName, kind)) return
         val cfg = config(c); val app = cfg.getJSONObject("apps").getJSONObject(packageName); val p = prefs(c)
+        val diagnosticFields = PaymentCaptureGuard.diagnosticFields(text)
         val digest = MessageDigest.getInstance("SHA-256").digest("${cfg.optString("ledgerId")}|$packageName|$kind|$identity".toByteArray()).joinToString("") { "%02x".format(it) }
         val seen = JSONArray(p.getString("seen", "[]"))
-        if ((0 until seen.length()).any { seen.optString(it) == digest }) { PaymentTrace.event(c,"replay_skipped",packageName,kind,digest);return }
+        if ((0 until seen.length()).any { seen.optString(it) == digest }) { PaymentTrace.event(c,"replay_skipped",packageName,kind,digest,fields=diagnosticFields);return }
         // Notification and accessibility/OCR may report the same payment with
         // different source IDs. Suppress only a short semantic repeat window so
         // a later legitimate purchase of the same amount remains valid.
@@ -245,7 +247,7 @@ object PaymentAutomation {
             now - p.getLong("recentCaptureTime", 0L) in 0..semanticReplayWindow
         if (recentFingerprint.isNotEmpty() &&
             (legacyRepeat || PaymentReplayHistory.contains(replayHistory, recentFingerprint, now, semanticReplayWindow))) {
-            PaymentTrace.event(c,"replay_skipped",packageName,kind,digest)
+            PaymentTrace.event(c,"replay_skipped",packageName,kind,digest,fields=diagnosticFields)
             return
         }
         val event = JSONObject().put("id", digest).put("packageName", packageName).put("kind", kind)
@@ -265,7 +267,7 @@ object PaymentAutomation {
             PaymentReplayHistory.record(replayHistory, recentFingerprint, now),
         ).remove("recentCapture").remove("recentCaptureTime")
         check(edit.commit())
-        PaymentTrace.event(c,"queued",packageName,kind,digest,next.length())
+        PaymentTrace.event(c,"queued",packageName,kind,digest,next.length(),diagnosticFields)
         if(dropped>0) PaymentTrace.event(c,"queue_dropped",count=dropped)
         kick(c.applicationContext)
     }

@@ -95,15 +95,17 @@ object PaymentTracePolicy {
         val id = value.removePrefix("auto-")
         return if (Regex("^[a-f0-9]{64}$").matches(id)) id.take(12) else ""
     }
-    fun fields(value: Map<*, *>?): Map<String, String> {
+    fun fields(value: Map<*, *>?, reveal: Boolean = false): Map<String, String> {
         if (value == null) return emptyMap()
         val result = linkedMapOf<String, String>()
-        (value["amount"] as? String)?.trim()?.takeIf { Regex("^\\d{1,12}\\.\\d{2}$").matches(it) }
+        if (reveal) (value["amount"] as? String)?.trim()?.takeIf { Regex("^\\d{1,12}\\.\\d{2}$").matches(it) }
             ?.let { result["amount"] = it }
         for (key in listOf("merchant", "account", "category")) {
             val raw = (value[key] as? String)?.trim()?.takeIf { it.isNotEmpty() && it.length <= 100 } ?: continue
-            val tail = if (key == "account") Regex("\\d{4}$").find(raw)?.value ?: raw.takeLast(1) else raw.takeLast(1)
-            result[key] = if (raw.length == 1) "*" else raw.take(1) + "*".repeat((raw.length - tail.length - 1).coerceAtLeast(1)) + tail
+            if (reveal) result[key] = raw else {
+                val tail = if (key == "account") Regex("\\d{4}(?=\\D*$)").find(raw)?.value ?: raw.takeLast(1) else raw.takeLast(1)
+                result[key] = if (raw.length == 1) "*" else raw.take(1) + "*".repeat((raw.length - tail.length - 1).coerceAtLeast(1)) + tail
+            }
         }
         return result
     }

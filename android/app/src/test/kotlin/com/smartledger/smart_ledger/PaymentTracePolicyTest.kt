@@ -32,12 +32,33 @@ class PaymentTracePolicyTest {
             "category" to "餐饮美食",
             "raw" to "付款给谁的完整原文",
         ))
-        assertEquals("3.00", fields["amount"])
+        assertFalse(fields.containsKey("amount"))
         assertEquals("三**********司", fields["merchant"])
         assertEquals("招******1234", fields["account"])
         assertEquals("餐**食", fields["category"])
         assertFalse(fields.containsKey("raw"))
         assertTrue(PaymentTracePolicy.fields(mapOf("amount" to "转账3元")).isEmpty())
+        val revealed = PaymentTracePolicy.fields(mapOf(
+            "amount" to "3.00",
+            "merchant" to "三津实业（深圳）有限公司",
+            "account" to "招商银行信用卡1234",
+        ), reveal = true)
+        assertEquals("3.00", revealed["amount"])
+        assertEquals("三津实业（深圳）有限公司", revealed["merchant"])
+        assertEquals("招商银行信用卡1234", revealed["account"])
+    }
+    @Test fun accessibilityReceiptProducesUsefulMaskedDiagnosticFields() {
+        val fields = PaymentCaptureGuard.diagnosticFields(
+            "支付成功\n三津实业（深圳）有限公司\n¥ 3.00\n支付方式\n招商银行储蓄卡（1234）\n返回商家",
+        )
+        assertEquals("3.00", fields["amount"])
+        assertEquals("三津实业（深圳）有限公司", fields["merchant"])
+        assertEquals("招商银行储蓄卡（1234）", fields["account"])
+
+        val masked = PaymentTracePolicy.fields(fields)
+        assertFalse(masked.containsKey("amount"))
+        assertEquals("三**********司", masked["merchant"])
+        assertEquals("招********1234", masked["account"])
     }
     @Test fun rejectionReasonsDistinguishWechatFailuresWithoutRawContent() {
         val pkg="com.tencent.mm"

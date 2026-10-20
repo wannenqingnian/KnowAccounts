@@ -188,7 +188,7 @@ class PaymentAccessibilityService : AccessibilityService() {
             PaymentTrace.event(this,"node_read",pkg,"accessibility",count=visited)
             val assessment = pageSession.assess(lines, System.currentTimeMillis())
             if (assessment.matched) {
-                PaymentTrace.event(this,"page_session_matched",pkg,"accessibility",count=assessment.attempt)
+                PaymentTrace.event(this,"page_session_matched",pkg,"accessibility",count=assessment.attempt,fields=PaymentCaptureGuard.diagnosticFields(assessment.text))
                 PaymentAutomation.record(this, pkg, "accessibility", "matched")
                 val identity = PaymentCaptureGuard.semanticIdentity(pkg, assessment.text)
                     .ifEmpty { "${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}|${assessment.text}" }
@@ -199,7 +199,8 @@ class PaymentAccessibilityService : AccessibilityService() {
                 pageSession.complete()
                 PaymentOverlay.resumeAfterCapture()
             } else {
-                PaymentAutomation.record(this, pkg, "accessibility", assessment.reason)
+                PaymentAutomation.record(this, pkg, "accessibility", assessment.reason,
+                    fields=if (PaymentPageRouter.isChatClass(pkg, windowClass)) null else PaymentCaptureGuard.diagnosticFields(assessment.text))
                 when {
                     assessment.shouldRetry -> {
                         PaymentTrace.event(this,"page_session_waiting",pkg,"accessibility",count=assessment.attempt)
@@ -324,7 +325,7 @@ class PaymentAccessibilityService : AccessibilityService() {
                 PaymentAutomation.ocrSuccessMarkerFound = PaymentCaptureGuard.successful(PaymentAutomation.MANUAL_OCR_PACKAGE, text)
                 PaymentAutomation.ocrRejectionReason = ""
                 PaymentTrace.event(this,"quick_ocr_text_read",PaymentAutomation.MANUAL_OCR_PACKAGE,"screenshot",count=lines.size)
-                PaymentTrace.event(this,"quick_ocr_matched",PaymentAutomation.MANUAL_OCR_PACKAGE,"screenshot")
+                PaymentTrace.event(this,"quick_ocr_matched",PaymentAutomation.MANUAL_OCR_PACKAGE,"screenshot",fields=PaymentCaptureGuard.diagnosticFields(text))
                 PaymentAutomation.enqueueScreenshot(this,text,capturedAt,ShortcutNotification.ledgerId(this))
             } catch (_: Throwable) {
                 PaymentAutomation.ocrScreenshotSucceeded = true
@@ -432,9 +433,9 @@ class PaymentAccessibilityService : AccessibilityService() {
                 }
                 handler.post {
                     if(active !== this) return@post
-                    if(matchedText==null) PaymentTrace.event(this,"ocr_no_match",pkg,"accessibility")
+                    if(matchedText==null) PaymentTrace.event(this,"ocr_no_match",pkg,"accessibility",fields=if(isWechatChat) null else PaymentCaptureGuard.diagnosticFields(textForEval))
                     else {
-                        PaymentTrace.event(this,"ocr_matched",pkg,"accessibility")
+                        PaymentTrace.event(this,"ocr_matched",pkg,"accessibility",fields=PaymentCaptureGuard.diagnosticFields(matchedText))
                         PaymentAutomation.enqueue(this,pkg,"accessibility",matchedText,System.currentTimeMillis(),
                             PaymentCaptureGuard.occurrenceIdentity("ocr|$identity", captureOccurrence))
                     }

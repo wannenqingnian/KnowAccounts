@@ -110,6 +110,7 @@ class DiagnosticExplanation {
 }
 
 const diagnosticStateLabels = <String, String>{
+  'sensitiveLogging': '敏感识别信息日志',
   'enabled': '自动记账总开关',
   'enhanced': '无障碍增强',
   'screenshotFallback': '支付页面本地截图OCR增强',
@@ -141,6 +142,17 @@ class DiagnosticEvent {
   final String code, app, source, reference;
   final Map<String, String> fields;
   String get label => diagnosticLabels[code]!;
+  String get recognizedText => fields.entries
+      .map(
+        (item) =>
+            '${switch (item.key) {
+              'amount' => '金额',
+              'merchant' => '商户',
+              'account' => '账户',
+              _ => '分类',
+            }} ${item.value}',
+      )
+      .join(' · ');
 
   /// High-frequency lifecycle probes stay available through the “处理中”
   /// filter, but do not flood the default meaningful-event view or export.
@@ -163,17 +175,7 @@ class DiagnosticEvent {
 
   String detailedText() {
     final detail = explanation;
-    final recognized = fields.entries
-        .map(
-          (item) =>
-              '${switch (item.key) {
-                'amount' => '金额',
-                'merchant' => '商户',
-                'account' => '账户',
-                _ => '分类',
-              }} ${item.value}',
-        )
-        .join(' · ');
+    final recognized = recognizedText;
     final level = switch (detail.level) {
       DiagnosticLevel.error => '错误',
       DiagnosticLevel.warning => '警告',
@@ -753,6 +755,7 @@ class AutomationDiagnostics {
   final NotificationDiagnostic notification;
   factory AutomationDiagnostics.fromJson(Map data) {
     final raw = data['state'] is Map ? data['state'] as Map : const {};
+    final revealSensitive = raw['sensitiveLogging'] == true;
     final accessibilityMap = raw['accessibility'] is Map
         ? raw['accessibility'] as Map
         : const {};
@@ -794,7 +797,7 @@ class AutomationDiagnostics {
               : '',
           bounded(row['count'], 1000000),
           bounded(row['repeats'], 999999, 1),
-          fields: _diagnosticFields(row['fields']),
+          fields: _diagnosticFields(row['fields'], reveal: revealSensitive),
         ),
       );
     }
@@ -865,7 +868,7 @@ class AutomationDiagnostics {
     );
 
     out.writeln(
-      '\n以下为最近48小时最多400条有效诊断，最新在前；内部轮询过程已过滤，识别摘要已脱敏，未包含支付原文、完整卡号或聊天内容。',
+      '\n以下为最近48小时最多400条有效诊断，最新在前；内部轮询过程已过滤。${state['sensitiveLogging'] == true ? '已开启敏感识别信息，分享前请检查金额、商户及账户。' : '识别摘要已脱敏，金额未记录。'}',
     );
     for (final event in events.where((event) => !event.isInternalNoise)) {
       out.write(event.detailedText());
@@ -874,19 +877,25 @@ class AutomationDiagnostics {
   }
 }
 
-Map<String, String> _diagnosticFields(dynamic value) {
+Map<String, String> _diagnosticFields(dynamic value, {bool reveal = false}) {
   if (value is! Map) return const {};
   final result = <String, String>{};
   final amount = value['amount'];
-  if (amount is String && RegExp(r'^\d{1,12}\.\d{2}$').hasMatch(amount)) {
+  if (reveal &&
+      amount is String &&
+      RegExp(r'^\d{1,12}\.\d{2}$').hasMatch(amount)) {
     result['amount'] = amount;
   }
   for (final key in const ['merchant', 'account', 'category']) {
     final raw = value[key];
     if (raw is! String || raw.isEmpty || raw.length > 100) continue;
+    if (reveal) {
+      result[key] = raw;
+      continue;
+    }
     final chars = raw.runes.map(String.fromCharCode).toList();
     final tail = key == 'account'
-        ? (RegExp(r'\d{4}$').firstMatch(raw)?[0] ?? chars.last)
+        ? (RegExp(r'\d{4}(?=\D*$)').firstMatch(raw)?[0] ?? chars.last)
         : chars.last;
     result[key] = chars.length == 1
         ? '*'

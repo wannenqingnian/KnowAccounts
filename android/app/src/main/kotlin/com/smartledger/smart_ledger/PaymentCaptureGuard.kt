@@ -148,6 +148,35 @@ object PaymentCaptureGuard {
     }
     fun replayWindow(identity: String): Long =
         if (identity.contains("|id:")) 48 * 60 * 60 * 1000L else 10 * 60 * 1000L
+    internal fun diagnosticFields(input: String): Map<String, String> {
+        val text = receiptBody(input)
+        val lines = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        fun labeled(labels: String): String? {
+            val pattern = Regex("^(?:$labels)\\s*[:：]?\\s*(.*)$")
+            for (i in lines.indices) {
+                val match = pattern.matchEntire(lines[i]) ?: continue
+                val inline = match.groupValues[1].trim()
+                if (inline.isNotEmpty()) return inline.take(100)
+                lines.getOrNull(i + 1)?.takeIf { it.length <= 100 }?.let { return it }
+            }
+            return null
+        }
+        val amount = transactionAmount(text)
+        val account = labeled("支付方式|付款方式|付款账户|扣款账户|支付账户|支付渠道|转入方式|充值方式|到账银行卡")
+        val merchant = labeled("商户全称|商户名称|商户名|商家名称|商户|商家|收款方|收款人|商品名称|商品|交易说明|转账说明")
+            ?: Regex("(?:你|您)(?:已|已经)?向(.{1,60}?)(?:支付|付款|转账)").find(text)?.groupValues?.get(1)?.trim()
+            ?: amount?.let { value ->
+                val amountLine = lines.indexOfFirst { normalizeAmount(it) == value }
+                lines.getOrNull(amountLine - 1)?.takeIf {
+                    it.length <= 60 && !Regex("支付成功|付款成功|交易成功|支付完成|微信支付|支付宝").matches(it)
+                }
+            }
+        return linkedMapOf<String, String>().apply {
+            amount?.let { put("amount", it) }
+            merchant?.takeIf { it.isNotEmpty() }?.let { put("merchant", it) }
+            account?.takeIf { it.isNotEmpty() }?.let { put("account", it) }
+        }
+    }
     /**
      * Picks a transaction amount by field role instead of the first number on
      * screen. A receipt can contain original price, discount, balance and the
