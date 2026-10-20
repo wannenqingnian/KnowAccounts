@@ -24,6 +24,21 @@ class PaymentTracePolicyTest {
         assertFalse(PaymentTracePolicy.retained(now+1,now))
         assertFalse(PaymentTracePolicy.retained(0,now))
     }
+    @Test fun recognizedFieldsAreAllowlistedAndMasked() {
+        val fields = PaymentTracePolicy.fields(mapOf(
+            "amount" to "3.00",
+            "merchant" to "三津实业（深圳）有限公司",
+            "account" to "招商银行信用卡1234",
+            "category" to "餐饮美食",
+            "raw" to "付款给谁的完整原文",
+        ))
+        assertEquals("3.00", fields["amount"])
+        assertEquals("三**********司", fields["merchant"])
+        assertEquals("招******1234", fields["account"])
+        assertEquals("餐**食", fields["category"])
+        assertFalse(fields.containsKey("raw"))
+        assertTrue(PaymentTracePolicy.fields(mapOf("amount" to "转账3元")).isEmpty())
+    }
     @Test fun rejectionReasonsDistinguishWechatFailuresWithoutRawContent() {
         val pkg="com.tencent.mm"
         assertEquals("untrusted_title",PaymentCaptureGuard.notificationReason(pkg,"张三","支付成功16元",false))

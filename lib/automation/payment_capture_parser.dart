@@ -266,7 +266,7 @@ class PaymentCaptureParser {
         .firstOrNull;
     if (accountText.isEmpty &&
         bound != null &&
-        !RegExp(r'银行卡|信用卡|花呗|白条|尾号|余额|零钱|支付方式|付款方式').hasMatch(normalized)) {
+        !RegExp(r'银行卡|信用卡|花呗|白条|尾号|余额|零钱').hasMatch(normalized)) {
       accountText = bound.name;
     }
     final category = categories

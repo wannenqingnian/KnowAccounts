@@ -165,6 +165,28 @@ class _AppearancePageState extends ConsumerState<AppearancePage> {
               setState(() => _value = _value.copyWith(seedColor: value)),
         ),
         const SizedBox(height: 18),
+        _title('收支颜色'),
+        RadioGroup<String>(
+          groupValue: _value.transactionPalette,
+          onChanged: (value) => setState(
+            () => _value = _value.copyWith(transactionPalette: value),
+          ),
+          child: const Column(
+            children: [
+              RadioListTile<String>(
+                value: 'expenseRed',
+                title: Text('支出红 · 收入绿'),
+                subtitle: Text('− 支出使用红色，＋收入使用绿色'),
+              ),
+              RadioListTile<String>(
+                value: 'expenseGreen',
+                title: Text('支出绿 · 收入红'),
+                subtitle: Text('− 支出使用绿色，＋收入使用红色'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
         _title('页面背景'),
         _colorPicker(
           values: _backgrounds,

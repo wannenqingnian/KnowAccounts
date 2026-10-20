@@ -159,6 +159,7 @@ void main() {
       fontScale: 1.2,
       iconStyle: 'filled',
       brightness: 'dark',
+      transactionPalette: 'expenseGreen',
     );
     final decoded = AppearanceSettings.decode(value.shareCode());
     expect(decoded.seedColor, value.seedColor);
@@ -166,6 +167,13 @@ void main() {
     expect(decoded.fontScale, 1.2);
     expect(decoded.iconStyle, 'filled');
     expect(decoded.brightness, 'dark');
+    expect(decoded.transactionPalette, 'expenseGreen');
+    expect(
+      AppearanceSettings.decode(
+        '{"version":1,"seedColor":4280126579,"backgroundColor":4294441202,"font":"system","fontScale":1.0,"iconStyle":"outlined","brightness":"system"}',
+      ).transactionPalette,
+      'expenseRed',
+    );
     expect(
       () => AppearanceSettings.decode('ZHI-THEME-1:not-valid'),
       throwsFormatException,

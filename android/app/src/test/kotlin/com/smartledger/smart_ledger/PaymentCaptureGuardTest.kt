@@ -207,6 +207,11 @@ class PaymentCaptureGuardTest {
             PaymentCaptureGuard.replayIdentity("com.tencent.mm", sparse),
         )
     }
+    @Test fun replayWindowKeepsAnUnchangedPaymentPageSuppressedLongEnough() {
+        assertEquals(48 * 60 * 60 * 1000L, PaymentCaptureGuard.replayWindow("com.tencent.mm|id:420000123456"))
+        assertEquals(10 * 60 * 1000L, PaymentCaptureGuard.replayWindow("com.tencent.mm|scene:expense|amount:3.00|peer:三津实业"))
+        assertEquals(10 * 60 * 1000L, PaymentCaptureGuard.replayWindow("com.tencent.mm|scene:expense|amount:3.00|peer:三津实业|time:08:22:06"))
+    }
     @Test fun screenshotFallbackRequiresRecentChatTimestampAndStrongCardFields() {
         val now=SimpleDateFormat("yyyy-MM-dd HH:mm",Locale.US).parse("2026-10-06 09:01")!!.time
         fun line(text:String,top:Int)=OcrLine(text,20,top,500,top+30)

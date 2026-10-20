@@ -2,12 +2,12 @@
 
 离线优先的智能记账 App，支持手动记账、自动记账、OCR 和本地语音识别。账本、识别、解析、学习与统计默认在设备内完成，不依赖账号或云端服务。
 
-当前稳定版本：`0.29.11`。
+当前稳定版本：`0.29.12`。
 
 ## 下载
 
-- [Android ARM64 APK](https://github.com/wannenqingnian/KnowAccounts/releases/download/v0.29.11/smart-ledger-0.29.11-arm64.apk)
-- [SHA-256 校验文件](https://github.com/wannenqingnian/KnowAccounts/releases/download/v0.29.11/smart-ledger-0.29.11-arm64.apk.sha256)
+- [Android ARM64 APK](https://github.com/wannenqingnian/KnowAccounts/releases/download/v0.29.12/smart-ledger-0.29.12-arm64.apk)
+- [SHA-256 校验文件](https://github.com/wannenqingnian/KnowAccounts/releases/download/v0.29.12/smart-ledger-0.29.12-arm64.apk.sha256)
 - [全部版本](https://github.com/wannenqingnian/KnowAccounts/releases)
 
 当前发布包支持 Android 7.0 及以上，仅提供 `arm64-v8a` APK。iOS 和 Linux 项目源码保留在仓库中，但暂未提供安装包。
@@ -39,8 +39,8 @@
 ### 数据与外观
 
 - AES-256-GCM 加密备份及 WebDAV 加密整库上传/恢复。
-- 浅色/深色模式、主题色、背景、字体、字号和图标风格。
-- 金额隐私模式、日志中心和本地安全存储。
+- 浅色/深色模式、主题色、背景、字体、字号、图标风格和两套红绿收支金额配色。
+- 金额隐私模式、统一诊断中心和本地安全存储。
 
 ## 隐私与权限
 
@@ -68,7 +68,7 @@ python3 tool/verify_ocr_jni_apk.py build/app/outputs/flutter-apk/app-release.apk
 python3 tool/verify_automation_apk.py build/app/outputs/flutter-apk/app-release.apk --aapt "$ANDROID_HOME/build-tools/36.0.0/aapt"
 ```
 
-GitHub Actions 会在 `main` 更新时构建 Android ARM64 产物。推送与 `pubspec.yaml` 一致的版本标签（例如 `v0.29.11`）后，会使用 GitHub Actions Secrets 中保存的固定签名构建 APK、生成 SHA-256 文件并发布 GitHub Release。签名私钥不会提交到源码。
+GitHub Actions 会在 `main` 更新时构建 Android ARM64 产物。推送与 `pubspec.yaml` 一致的版本标签（例如 `v0.29.12`）后，会使用 GitHub Actions Secrets 中保存的固定签名构建 APK、生成 SHA-256 文件并发布 GitHub Release。签名私钥不会提交到源码。
 
 ## 项目结构
 
@@ -98,5 +98,6 @@ docs/                  功能、设计与开发文档
 - [统一置信度引擎](docs/CONFIDENCE.md)
 - [备份、账户与维护说明](docs/MAINTENANCE.md)
 - [2026-10-19 Material 3 UI 交接](docs/2026-10-19-handoff-material3-ui.md)
+- [2026-10-20 版本 0.29.12 交接](docs/2026-10-20-handoff-v0.29.12.md)
 
 首次启动只创建空账本、默认账户和分类，不插入演示交易。自动记账在字段缺失、冲突、低置信或疑似重复时进入人工核对，不会为了提高自动入账率而静默保存不确定账单。

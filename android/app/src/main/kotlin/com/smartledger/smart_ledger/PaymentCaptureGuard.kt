@@ -146,6 +146,8 @@ object PaymentCaptureGuard {
         val identity = semanticIdentity(packageName, input)
         return if (identity.contains("|scene:refund|")) identity.replace(Regex("\\|peer:[^|]*"), "") else identity
     }
+    fun replayWindow(identity: String): Long =
+        if (identity.contains("|id:")) 48 * 60 * 60 * 1000L else 10 * 60 * 1000L
     /**
      * Picks a transaction amount by field role instead of the first number on
      * screen. A receipt can contain original price, discount, balance and the

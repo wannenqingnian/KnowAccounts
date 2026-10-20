@@ -85,7 +85,7 @@ Future<void> runPaymentAutomationWorker({
           confidence.percent,
         );
       }
-      final preview = outcome == 'pending' || outcome == 'repeated'
+      final preview = outcome == 'pending'
           ? await paymentPreview(repository, capture)
           : null;
       if (preview != null) {

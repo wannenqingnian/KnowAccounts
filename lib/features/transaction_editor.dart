@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,6 +12,8 @@ import 'attachment_panel.dart';
 import '../transaction/parser/transaction_parser.dart';
 import '../transaction/transaction_pipeline.dart';
 import 'date_time_picker.dart';
+import '../theme/transaction_colors.dart';
+import '../core/logging/app_logger.dart';
 
 Future<void> showTransactionEditor(
   BuildContext context, {
@@ -352,7 +356,16 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
   }
 
   Future<void> _save() async {
-    if (!_attachmentsReady || !_form.currentState!.validate()) return;
+    if (!_attachmentsReady || !_form.currentState!.validate()) {
+      unawaited(
+        AppLogger.instance.warning(
+          'transaction',
+          'validation_failed',
+          '记账表单校验未通过',
+        ),
+      );
+      return;
+    }
     final missingSelections = [
       if (_account == null) '请选择账户',
       if ((_type == TransactionType.expense ||
@@ -362,6 +375,13 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
     ];
     if (missingSelections.isNotEmpty) {
       setState(() => _error = missingSelections.join('；'));
+      unawaited(
+        AppLogger.instance.warning(
+          'transaction',
+          'selection_missing',
+          '记账表单缺少必填选择',
+        ),
+      );
       return;
     }
     if (ref.read(ledgerProvider).ledgerId != _attachmentLedger) {
@@ -478,6 +498,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
         .where((account) => account.id == _target)
         .firstOrNull;
     final colors = Theme.of(context).colorScheme;
+    final transactionColors = TransactionColors.of(context);
     final primary = colors.primary;
     final ink = colors.onSurface;
     final muted = colors.onSurfaceVariant;
@@ -899,7 +920,12 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                                 ],
                                 textAlign: TextAlign.end,
                                 style: TextStyle(
-                                  color: primary,
+                                  color: _type == TransactionType.expense
+                                      ? transactionColors.expense
+                                      : _type == TransactionType.income ||
+                                            _type == TransactionType.refund
+                                      ? transactionColors.income
+                                      : primary,
                                   fontSize: 36,
                                   fontWeight: FontWeight.w800,
                                 ),

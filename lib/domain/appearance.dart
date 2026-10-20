@@ -8,6 +8,7 @@ class AppearanceSettings {
     this.fontScale = 1,
     this.iconStyle = 'outlined',
     this.brightness = 'system',
+    this.transactionPalette = 'expenseRed',
   });
 
   final int seedColor;
@@ -16,6 +17,7 @@ class AppearanceSettings {
   final double fontScale;
   final String iconStyle;
   final String brightness;
+  final String transactionPalette;
 
   String? get fontFamily => switch (font) {
     'serif' => 'serif',
@@ -30,6 +32,7 @@ class AppearanceSettings {
     double? fontScale,
     String? iconStyle,
     String? brightness,
+    String? transactionPalette,
   }) => AppearanceSettings(
     seedColor: seedColor ?? this.seedColor,
     backgroundColor: backgroundColor ?? this.backgroundColor,
@@ -37,6 +40,7 @@ class AppearanceSettings {
     fontScale: fontScale ?? this.fontScale,
     iconStyle: iconStyle ?? this.iconStyle,
     brightness: brightness ?? this.brightness,
+    transactionPalette: transactionPalette ?? this.transactionPalette,
   );
 
   Map<String, Object> toJson() => {
@@ -47,6 +51,7 @@ class AppearanceSettings {
     'fontScale': fontScale,
     'iconStyle': iconStyle,
     'brightness': brightness,
+    'transactionPalette': transactionPalette,
   };
 
   String encode() => jsonEncode(toJson());
@@ -73,12 +78,14 @@ class AppearanceSettings {
     final font = json['font'];
     final icons = json['iconStyle'];
     final brightness = json['brightness'];
+    final transactionPalette = json['transactionPalette'] ?? 'expenseRed';
     if (seed is! int ||
         background is! int ||
         scale is! num ||
         !{'system', 'serif', 'monospace'}.contains(font) ||
         !{'outlined', 'filled', 'sharp'}.contains(icons) ||
         !{'system', 'light', 'dark'}.contains(brightness) ||
+        !{'expenseRed', 'expenseGreen'}.contains(transactionPalette) ||
         scale < .8 ||
         scale > 1.4) {
       throw const FormatException('主题参数无效');
@@ -90,6 +97,7 @@ class AppearanceSettings {
       fontScale: scale.toDouble(),
       iconStyle: icons as String,
       brightness: brightness as String,
+      transactionPalette: transactionPalette as String,
     );
   }
 }

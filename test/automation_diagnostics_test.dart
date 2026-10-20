@@ -6,6 +6,7 @@ import 'package:smart_ledger/automation/automation_bridge.dart';
 import 'package:smart_ledger/automation/payment_apps.dart';
 import 'package:smart_ledger/automation/automation_diagnostics.dart';
 import 'package:smart_ledger/features/automation_logs_page.dart';
+import 'package:smart_ledger/core/logging/app_logger.dart';
 
 Map<String, dynamic> event(String code, String app, String source, int time) =>
     {
@@ -71,12 +72,21 @@ void main() {
             ...event('money_missing', 'com.tencent.mm', 'notification', 1000),
             'text': secret,
             'amount': secret,
+            'fields': {
+              'amount': '3.00',
+              'merchant': '三津实业（深圳）有限公司',
+              'account': '招商银行信用卡1234',
+              'raw': secret,
+            },
           },
           {...event('worker_ready', secret, secret, 2000), 'ref': secret},
           event(secret, 'com.tencent.mm', 'notification', 3000),
         ],
       });
       expect(report.text(), isNot(contains(secret)));
+      expect(report.text(), contains('金额 3.00'));
+      expect(report.text(), contains('商户 三**********司'));
+      expect(report.text(), contains('账户 招******1234'));
       expect(report.events.length, 2);
       expect(report.events.first.code, 'worker_ready');
       expect(report.events.first.reference, isEmpty);
@@ -176,20 +186,25 @@ void main() {
         () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
       );
       final bridge = LogBridge();
+      final appLogger = AppLogger.memory();
+      await appLogger.error('database', 'database_open_failed', '本地数据库初始化失败');
       await tester.pumpWidget(
         ProviderScope(
           overrides: [automationBridgeProvider.overrideWithValue(bridge)],
-          child: const MaterialApp(home: AutomationLogsPage()),
+          child: MaterialApp(
+            home: AutomationLogsPage(appLogger: appLogger, liveRefresh: false),
+          ),
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.text('日志记录'), findsOneWidget);
+      expect(find.text('诊断中心'), findsOneWidget);
       expect(find.text('日志记录已开启'), findsOneWidget);
       expect(find.text('未找到可识别的交易金额'), findsOneWidget);
       expect(find.text('已匹配交易信息'), findsOneWidget);
       expect(find.textContaining('默认隐藏内部轮询'), findsOneWidget);
       expect(find.textContaining('警告 1'), findsOneWidget);
       expect(find.textContaining('成功 2'), findsOneWidget);
+      expect(find.textContaining('应用日志 · 1 条'), findsOneWidget);
       await tester.tap(find.byKey(const ValueKey('levelFilter')));
       await tester.pumpAndSettle();
       await tester.tap(find.widgetWithText(CheckedPopupMenuItem<String>, '警告'));
@@ -240,7 +255,7 @@ void main() {
       expect(bridge.events.length, 3);
       await tester.tap(find.byKey(const ValueKey('logActions')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('清空诊断日志'));
+      await tester.tap(find.text('清空全部诊断日志'));
       await tester.pumpAndSettle();
       expect(bridge.cleared, 1);
       expect(bridge.configs, 0);
@@ -257,10 +272,13 @@ void main() {
       ..events = [
         event('money_missing', 'com.tencent.mm', 'accessibility', 1000),
       ];
+    final appLogger = AppLogger.memory();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [automationBridgeProvider.overrideWithValue(bridge)],
-        child: const MaterialApp(home: AutomationLogsPage()),
+        child: MaterialApp(
+          home: AutomationLogsPage(appLogger: appLogger, liveRefresh: false),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -293,10 +311,13 @@ void main() {
         event('ocr_no_match', 'com.tencent.mm', 'accessibility', 2000),
         event('success_missing', 'com.tencent.mm', 'accessibility', 1000),
       ];
+    final appLogger = AppLogger.memory();
     await tester.pumpWidget(
       ProviderScope(
         overrides: [automationBridgeProvider.overrideWithValue(bridge)],
-        child: const MaterialApp(home: AutomationLogsPage()),
+        child: MaterialApp(
+          home: AutomationLogsPage(appLogger: appLogger, liveRefresh: false),
+        ),
       ),
     );
     await tester.pumpAndSettle();

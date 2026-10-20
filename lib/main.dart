@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:ui' show PlatformDispatcher;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'
     show LicenseRegistry, LicenseEntryWithLineBreaks;
@@ -12,9 +15,43 @@ import 'data/ledger_repository.dart';
 import 'features/home_shell.dart';
 import 'features/money_privacy.dart';
 import 'core/security/card_vault.dart';
+import 'theme/transaction_colors.dart';
+import 'core/logging/app_logger.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final logger = AppLogger.instance;
+  try {
+    await logger.initialize();
+  } catch (_) {
+    // Diagnostics must not prevent the app from starting.
+  }
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    unawaited(
+      logger.error(
+        'flutter',
+        'flutter_error',
+        'Flutter 界面发生异常',
+        error: details.exception,
+        stackTrace: details.stack,
+      ),
+    );
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    unawaited(
+      logger.error(
+        'flutter',
+        'uncaught_error',
+        '应用发生未处理异常',
+        error: error,
+        stackTrace: stack,
+        fatal: true,
+      ),
+    );
+    return false;
+  };
+  await logger.info('startup', 'startup_started', '应用开始启动');
   LicenseRegistry.addLicense(() async* {
     yield LicenseEntryWithLineBreaks([
       'PaddleOCR / PP-OCR',
@@ -30,18 +67,34 @@ Future<void> main() async {
       cardVault: const DeviceCardVault(),
     );
     await repository.initialize();
+    await logger.success('database', 'database_ready', '本地数据库初始化完成');
     try {
       await RecurringBackground.sync(repository);
-    } catch (_) {
+    } catch (error) {
+      await logger.warning(
+        'background',
+        'recurring_sync_skipped',
+        '周期任务启动同步未完成',
+        correlationId: error.runtimeType.toString(),
+      );
       // Unsupported desktop platforms still process plans when the app opens.
     }
+    await logger.success('startup', 'startup_completed', '应用启动完成');
     runApp(
       ProviderScope(
         overrides: [repositoryProvider.overrideWithValue(repository)],
         child: const SmartLedgerApp(),
       ),
     );
-  } catch (_) {
+  } catch (error, stackTrace) {
+    await logger.error(
+      'database',
+      'database_open_failed',
+      '本地数据库初始化失败',
+      error: error,
+      stackTrace: stackTrace,
+      fatal: true,
+    );
     runApp(
       const MaterialApp(
         home: Scaffold(
@@ -88,6 +141,9 @@ class SmartLedgerApp extends ConsumerWidget {
         scaffoldBackgroundColor: scheme.surface,
         visualDensity: VisualDensity.standard,
       );
+      final red = dark ? const Color(0xFFFFB3B8) : const Color(0xFFC63C4D);
+      final green = dark ? const Color(0xFF7DDBB7) : const Color(0xFF16815F);
+      final expenseGreen = appearance.transactionPalette == 'expenseGreen';
       final textTheme = base.textTheme.copyWith(
         headlineSmall: base.textTheme.headlineSmall?.copyWith(
           fontWeight: FontWeight.w700,
@@ -110,6 +166,12 @@ class SmartLedgerApp extends ConsumerWidget {
         ),
       );
       return base.copyWith(
+        extensions: [
+          TransactionColors(
+            expense: expenseGreen ? green : red,
+            income: expenseGreen ? red : green,
+          ),
+        ],
         textTheme: textTheme,
         iconTheme: IconThemeData(
           fill: appearance.iconStyle == 'filled' ? 1 : 0,

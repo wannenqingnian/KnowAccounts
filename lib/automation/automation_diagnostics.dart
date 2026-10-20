@@ -134,10 +134,12 @@ class DiagnosticEvent {
     this.source,
     this.reference,
     this.count,
-    this.repeats,
-  );
+    this.repeats, {
+    this.fields = const {},
+  });
   final int time, count, repeats;
   final String code, app, source, reference;
+  final Map<String, String> fields;
   String get label => diagnosticLabels[code]!;
 
   /// High-frequency lifecycle probes stay available through the “处理中”
@@ -161,6 +163,17 @@ class DiagnosticEvent {
 
   String detailedText() {
     final detail = explanation;
+    final recognized = fields.entries
+        .map(
+          (item) =>
+              '${switch (item.key) {
+                'amount' => '金额',
+                'merchant' => '商户',
+                'account' => '账户',
+                _ => '分类',
+              }} ${item.value}',
+        )
+        .join(' · ');
     final level = switch (detail.level) {
       DiagnosticLevel.error => '错误',
       DiagnosticLevel.warning => '警告',
@@ -175,6 +188,7 @@ class DiagnosticEvent {
         '${reference.isEmpty ? "" : " | 编号 $reference"}'
         '${count == 0 ? "" : " | 数量 $count"}'
         '${repeats <= 1 ? "" : " | 合并重复 $repeats 次"}'
+        '${recognized.isEmpty ? "" : " | 识别：$recognized"}'
         ' | 事件码 $code\n';
   }
 
@@ -780,6 +794,7 @@ class AutomationDiagnostics {
               : '',
           bounded(row['count'], 1000000),
           bounded(row['repeats'], 999999, 1),
+          fields: _diagnosticFields(row['fields']),
         ),
       );
     }
@@ -849,10 +864,33 @@ class AutomationDiagnostics {
       '最后连接时间：${notification.lastConnectedAt > 0 ? DateTime.fromMillisecondsSinceEpoch(notification.lastConnectedAt).toLocal().toIso8601String().replaceFirst("T", " ") : "无记录"}',
     );
 
-    out.writeln('\n以下为最近48小时最多400条有效诊断，最新在前；内部轮询过程已过滤，未包含金额、商户、支付原文、卡号或聊天内容。');
+    out.writeln(
+      '\n以下为最近48小时最多400条有效诊断，最新在前；内部轮询过程已过滤，识别摘要已脱敏，未包含支付原文、完整卡号或聊天内容。',
+    );
     for (final event in events.where((event) => !event.isInternalNoise)) {
       out.write(event.detailedText());
     }
     return out.toString();
   }
+}
+
+Map<String, String> _diagnosticFields(dynamic value) {
+  if (value is! Map) return const {};
+  final result = <String, String>{};
+  final amount = value['amount'];
+  if (amount is String && RegExp(r'^\d{1,12}\.\d{2}$').hasMatch(amount)) {
+    result['amount'] = amount;
+  }
+  for (final key in const ['merchant', 'account', 'category']) {
+    final raw = value[key];
+    if (raw is! String || raw.isEmpty || raw.length > 100) continue;
+    final chars = raw.runes.map(String.fromCharCode).toList();
+    final tail = key == 'account'
+        ? (RegExp(r'\d{4}$').firstMatch(raw)?[0] ?? chars.last)
+        : chars.last;
+    result[key] = chars.length == 1
+        ? '*'
+        : '${chars.first}${List.filled((chars.length - tail.length - 1).clamp(1, 100), '*').join()}$tail';
+  }
+  return result;
 }

@@ -15,7 +15,7 @@ object PaymentTrace {
     }
     @Synchronized fun clear(c: Context) { prefs(c).edit().remove("rows").apply() }
     private fun stored(c: Context): JSONArray = try { JSONArray(prefs(c).getString("rows","[]")) } catch (_: Exception) { JSONArray() }
-    @Synchronized fun event(c: Context, code: String, pkg: String="", kind: String="", ref: String="", count: Int=0) {
+    @Synchronized fun event(c: Context, code: String, pkg: String="", kind: String="", ref: String="", count: Int=0, fields: Map<*, *>?=null) {
         try {
             if (!enabled(c) || code !in PaymentTracePolicy.codes) return
             val now=System.currentTimeMillis()
@@ -26,11 +26,11 @@ object PaymentTrace {
                 if(PaymentTracePolicy.retained(item.optLong("time"),now)) rows.put(item)
             }
             val app=pkg.takeIf { it in PaymentCaptureGuard.packages || it == PaymentAutomation.MANUAL_OCR_PACKAGE } ?: ""
-            val source=PaymentTracePolicy.source(kind); val reference=PaymentTracePolicy.reference(ref)
+            val source=PaymentTracePolicy.source(kind); val reference=PaymentTracePolicy.reference(ref); val recognized=PaymentTracePolicy.fields(fields)
             val last=if(rows.length()>0) rows.optJSONObject(rows.length()-1) else null
-            if(last!=null && last.optString("code")==code && last.optString("app")==app && last.optString("source")==source && last.optString("ref")==reference && now-last.optLong("time")<3000) {
+            if(last!=null && last.optString("code")==code && last.optString("app")==app && last.optString("source")==source && last.optString("ref")==reference && last.optJSONObject("fields")?.toString()==JSONObject(recognized).toString() && now-last.optLong("time")<3000) {
                 last.put("time",now).put("repeats",minOf(999999,last.optInt("repeats",1)+1)).put("count",count.coerceIn(0,1000000))
-            } else rows.put(JSONObject().put("time",now).put("code",code).put("app",app).put("source",source).put("ref",reference).put("count",count.coerceIn(0,1000000)).put("repeats",1))
+            } else rows.put(JSONObject().put("time",now).put("code",code).put("app",app).put("source",source).put("ref",reference).put("count",count.coerceIn(0,1000000)).put("repeats",1).put("fields",JSONObject(recognized)))
             val bounded=JSONArray()
             for(i in maxOf(0, rows.length()-PaymentTracePolicy.maxEntries) until rows.length()) bounded.put(rows.get(i))
             prefs(c).edit().putString("rows",bounded.toString()).apply()
@@ -42,11 +42,13 @@ object PaymentTrace {
             val row=rows.optJSONObject(i) ?: continue
             val code=row.optString("code")
             if(code !in PaymentTracePolicy.codes || !PaymentTracePolicy.retained(row.optLong("time"),now)) continue
+            val fields=row.optJSONObject("fields")
+            val recognized=PaymentTracePolicy.fields(fields?.let { json -> json.keys().asSequence().associateWith { json.optString(it) } })
             events.add(mapOf("time" to row.optLong("time"),"code" to code,
                 "app" to (row.optString("app").takeIf { it in PaymentCaptureGuard.packages || it == PaymentAutomation.MANUAL_OCR_PACKAGE } ?: ""),
                 "source" to PaymentTracePolicy.source(row.optString("source")),
                 "ref" to (row.optString("ref").takeIf {Regex("^[a-f0-9]{12}$").matches(it)} ?: ""),
-                "count" to row.optInt("count").coerceIn(0,1000000),"repeats" to row.optInt("repeats",1).coerceIn(1,999999)))
+                "count" to row.optInt("count").coerceIn(0,1000000),"repeats" to row.optInt("repeats",1).coerceIn(1,999999),"fields" to recognized))
         }
         val status=PaymentAutomation.status(c);val config=PaymentAutomation.config(c)
         val keys=listOf("notificationsGranted","accessibilityGranted","notificationConnected","accessibilityConnected","workerRunning","overlayGranted","overlayVisible","ocrModelReady","queued","error","errorCode")

@@ -62,6 +62,9 @@ void main() {
             return true;
           case 'ack':
             outcomes.add(call.arguments['outcome']);
+            if (call.arguments['outcome'] == 'repeated') {
+              expect(call.arguments.containsKey('preview'), isFalse);
+            }
             remaining--;
             expect((await repo.entries('personal')).length, 1);
             return null;
@@ -96,6 +99,43 @@ void main() {
       expect(failed, true);
     },
   );
+  test('repeated pending capture does not reopen the floating form', () async {
+    final db = AppDatabase.memory();
+    final repo = LedgerRepository(db);
+    await repo.initialize();
+    final data = {
+      'id': 'c' * 64,
+      'packageName': 'com.tencent.mm',
+      'kind': 'accessibility',
+      'text': '支付成功\n商户名称 三津实业\n交易金额 3.00元',
+      'capturedAt': DateTime(2026, 10, 20, 8, 22).millisecondsSinceEpoch,
+      'ledgerId': 'personal',
+      'autoSave': false,
+    };
+    var remaining = 2;
+    final previews = <bool>[];
+    messenger.setMockMethodCallHandler(AutomationBridge.channel, (call) async {
+      switch (call.method) {
+        case 'workerTrace':
+        case 'takeConfirmation':
+          return null;
+        case 'take':
+          return remaining-- > 0 ? data : null;
+        case 'authorize':
+          return true;
+        case 'ack':
+          previews.add((call.arguments as Map).containsKey('preview'));
+          return null;
+        case 'finish':
+          return null;
+      }
+      throw StateError('Unexpected worker method');
+    });
+
+    await runPaymentAutomationWorker(openDatabase: () async => db);
+
+    expect(previews, [true, false]);
+  });
   test(
     'floating form background save commits before native success, then closes database',
     () async {

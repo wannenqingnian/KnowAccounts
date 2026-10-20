@@ -176,12 +176,27 @@ object PaymentAutomation {
                         val q = queued(context); val next = JSONArray(); var found = false
                         for (i in 0 until q.length()) { val e = q.getJSONObject(i); if (e.optString("id") == id) found = true else next.put(e) }
                         if (found) {
-                            PaymentTrace.event(context,if(outcome in listOf("posted","pending","repeated","discarded")) "worker_$outcome" else "processing_error",ref=id ?: "")
+                            val preview=call.argument<Map<String,Any?>>("preview")
+                            fun selectedName(list: String, selected: String): String {
+                                val selectedId=preview?.get(selected) as? String ?: return ""
+                                return (preview[list] as? List<*>)?.mapNotNull { it as? Map<*, *> }
+                                    ?.firstOrNull { it["id"] == selectedId }?.get("name") as? String ?: ""
+                            }
+                            PaymentTrace.event(
+                                context,
+                                if(outcome in listOf("posted","pending","repeated","discarded")) "worker_$outcome" else "processing_error",
+                                ref=id ?: "",
+                                fields=mapOf(
+                                    "amount" to (preview?.get("amount") as? String ?: ""),
+                                    "merchant" to (preview?.get("merchant") as? String ?: ""),
+                                    "account" to selectedName("accounts", "accountId"),
+                                    "category" to selectedName("categories", "categoryId"),
+                                ),
+                            )
                             writeQueue(context, next)
                             val p = prefs(context); val edit = p.edit().putLong("lastTime", System.currentTimeMillis()).putBoolean("error", false)
                             if (outcome in listOf("posted", "pending")) edit.putInt(outcome!!, p.getInt(outcome, 0) + 1)
                             edit.apply(); ui?.invokeMethod("updated", null)
-                            val preview=call.argument<Map<String,Any?>>("preview")
                             val manual = call.argument<String>("kind") == "screenshot"
                             if(manual && outcome == "discarded") ShortcutNotification.notifyCaptureFailure(context,"未识别到明确账单，请在支付成功或账单详情页面重试")
                             if(preview!=null && (manual || (config(context).optBoolean("enabled") && config(context).optBoolean("reviewPopup",true)))) PaymentOverlay.show(context,preview)
@@ -224,11 +239,7 @@ object PaymentAutomation {
             .digest("${cfg.optString("ledgerId")}|$semantic".toByteArray())
             .joinToString("") { "%02x".format(it) }
         val now = System.currentTimeMillis()
-        val semanticReplayWindow = when {
-            semantic.contains("|id:") -> 48 * 60 * 60 * 1000L
-            semantic.contains("|time:") -> 10 * 60 * 1000L
-            else -> 30_000L
-        }
+        val semanticReplayWindow = PaymentCaptureGuard.replayWindow(semantic)
         val replayHistory = p.getString("recentCaptures", "") ?: ""
         val legacyRepeat = p.getString("recentCapture", "") == recentFingerprint &&
             now - p.getLong("recentCaptureTime", 0L) in 0..semanticReplayWindow

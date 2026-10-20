@@ -1,6 +1,7 @@
 import 'money_privacy.dart';
 import 'package:flutter/material.dart';
 import '../domain/models.dart';
+import '../theme/transaction_colors.dart';
 
 const ink = Color(0xFF183C38);
 const teal = Color(0xFF237A66);
@@ -89,6 +90,7 @@ class EntryTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final transactionColors = TransactionColors.of(context);
     final positive =
         entry.type == TransactionType.income ||
         entry.type == TransactionType.refund;
@@ -140,7 +142,11 @@ class EntryTile extends StatelessWidget {
             ? '+'
             : '-'}${entry.currency == 'CNY' ? visibleMoney(context, entry.amountMinor) : visibleCurrencyMoney(context, entry.displayAmountMinor, symbol: entry.currencySymbol, decimals: entry.currencyDecimals)}',
         style: TextStyle(
-          color: positive ? colors.primary : colors.onSurface,
+          color: transfer
+              ? colors.onSurface
+              : positive
+              ? transactionColors.income
+              : transactionColors.expense,
           fontWeight: FontWeight.w700,
           fontSize: 15,
         ),

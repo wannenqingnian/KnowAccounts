@@ -246,6 +246,16 @@ void main() {
       expect(parsed.draft.amountMinor, 1600);
       expect(parsed.draft.accountId, a.id);
       expect(parsed.canAutoSave, true, reason: parsed.draft.warnings.join(';'));
+      final labelOnly = PaymentCaptureParser().parse(
+        event(
+          '支付成功\n商户名称 精品沙县小吃\n交易金额 16.00元\n支付方式\n支付时间 2026-10-05',
+          accountId: a.id,
+        ),
+        accounts,
+        categories,
+        now: time,
+      );
+      expect(labelOnly.draft.accountId, a.id);
       expect(
         PaymentCaptureParser()
             .parse(event(text), accounts, categories, now: time)

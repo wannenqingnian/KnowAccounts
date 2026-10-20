@@ -7,7 +7,24 @@ import 'package:flutter/services.dart' hide DiagnosticLevel;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../automation/automation_bridge.dart';
 import '../automation/automation_diagnostics.dart';
+import '../core/logging/app_logger.dart';
 import 'action_form.dart';
+
+DiagnosticLevel _appLevel(AppLogLevel level) => switch (level) {
+  AppLogLevel.info => DiagnosticLevel.normal,
+  AppLogLevel.success => DiagnosticLevel.success,
+  AppLogLevel.warning => DiagnosticLevel.warning,
+  AppLogLevel.error || AppLogLevel.fatal => DiagnosticLevel.error,
+};
+
+String _appArea(String area) => switch (area) {
+  'startup' => '系统',
+  'database' => '数据库',
+  'transaction' => '手动记账',
+  'flutter' => '界面',
+  'background' => '后台任务',
+  _ => '应用',
+};
 
 Color _diagnosticColor(BuildContext context, DiagnosticLevel level) =>
     switch (level) {
@@ -67,15 +84,18 @@ class _DiagnosticDetail extends StatelessWidget {
 }
 
 class _DiagnosticSummary extends StatelessWidget {
-  const _DiagnosticSummary({required this.events});
+  const _DiagnosticSummary({required this.events, required this.appEvents});
 
   final List<DiagnosticEvent> events;
+  final List<AppLogEntry> appEvents;
 
   @override
   Widget build(BuildContext context) {
-    int count(DiagnosticLevel level) => events
-        .where((event) => event.explanation.level == level)
-        .fold(0, (sum, event) => sum + event.repeats);
+    int count(DiagnosticLevel level) =>
+        events
+            .where((event) => event.explanation.level == level)
+            .fold(0, (sum, event) => sum + event.repeats) +
+        appEvents.where((event) => _appLevel(event.level) == level).length;
     final errors = count(DiagnosticLevel.error);
     final warnings = count(DiagnosticLevel.warning);
     final successes = count(DiagnosticLevel.success);
@@ -97,6 +117,20 @@ class _DiagnosticSummary extends StatelessWidget {
               event.explanation.level == DiagnosticLevel.warning,
         )
         .firstOrNull;
+    final latestAppProblem = appEvents
+        .where(
+          (event) =>
+              _appLevel(event.level) == DiagnosticLevel.error ||
+              _appLevel(event.level) == DiagnosticLevel.warning,
+        )
+        .firstOrNull;
+    final appProblemIsLatest =
+        latestAppProblem != null &&
+        (latestProblem == null ||
+            latestAppProblem.time.millisecondsSinceEpoch > latestProblem.time);
+    final latestProblemLabel = appProblemIsLatest
+        ? latestAppProblem.message
+        : latestProblem?.label;
     return Card(
       margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
       color: color.withValues(alpha: 0.08),
@@ -124,12 +158,12 @@ class _DiagnosticSummary extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              latestProblem == null
+              latestProblemLabel == null
                   ? '所有诊断记录均未发现需处理的问题。'
-                  : '最近问题：${latestProblem.label}',
+                  : '最近问题：$latestProblemLabel',
             ),
           ),
-          if (latestProblem != null) ...[
+          if (!appProblemIsLatest && latestProblem != null) ...[
             const SizedBox(height: 4),
             Align(
               alignment: Alignment.centerLeft,
@@ -255,25 +289,38 @@ class _LogFilterMenu extends StatelessWidget {
 }
 
 class AutomationLogsPage extends ConsumerStatefulWidget {
-  const AutomationLogsPage({super.key});
+  const AutomationLogsPage({
+    super.key,
+    this.appLogger,
+    this.liveRefresh = true,
+  });
+  final AppLogger? appLogger;
+  final bool liveRefresh;
   @override
   ConsumerState<AutomationLogsPage> createState() => _AutomationLogsPageState();
 }
 
 class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
     with WidgetsBindingObserver {
+  AppLogger get _appLogger => widget.appLogger ?? AppLogger.instance;
   AutomationDiagnostics? _report;
+  List<AppLogEntry> _appEvents = [];
   Timer? _timer;
-  bool _busy = false, _foreground = true, _wechatOnly = false, _sortAscending = false;
+  bool _busy = false,
+      _foreground = true,
+      _wechatOnly = false,
+      _sortAscending = false;
   String _source = 'all', _level = 'all';
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _refresh();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (_foreground && !_busy) _refresh();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refresh());
+    if (widget.liveRefresh) {
+      _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+        if (_foreground && !_busy) _refresh();
+      });
+    }
   }
 
   @override
@@ -294,8 +341,12 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
     _busy = true;
     try {
       final data = await ref.read(automationBridgeProvider).diagnostics();
+      final appEvents = await _appLogger.read();
       if (mounted) {
-        setState(() => _report = AutomationDiagnostics.fromJson(data));
+        setState(() {
+          _report = AutomationDiagnostics.fromJson(data);
+          _appEvents = appEvents;
+        });
       }
     } catch (e) {
       if (mounted) showError(context, e);
@@ -321,7 +372,7 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
     await _refresh();
     if (_report == null) return;
     await _action(() async {
-      final bytes = Uint8List.fromList(utf8.encode(_report!.text()));
+      final bytes = Uint8List.fromList(utf8.encode(await _fullText()));
       final path = await FilePicker.platform.saveFile(
         dialogTitle: '导出诊断日志',
         fileName: '知账-诊断日志-${DateTime.now().millisecondsSinceEpoch}.txt',
@@ -339,6 +390,11 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
         ).showSnackBar(const SnackBar(content: Text('日志已导出')));
       }
     });
+  }
+
+  Future<String> _fullText() async {
+    final appText = await _appLogger.text();
+    return '${_report?.text() ?? ''}\n\n--- Flutter 应用日志 ---\n$appText';
   }
 
   @override
@@ -369,6 +425,22 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
         _ => true,
       };
     }).toList();
+    final appEvents = (_source == 'all' || _source == 'app') && !_wechatOnly
+        ? _appEvents.where((event) {
+            final level = _appLevel(event.level);
+            return switch (_level) {
+              'error' => level == DiagnosticLevel.error,
+              'warning' => level == DiagnosticLevel.warning,
+              'success' => level == DiagnosticLevel.success,
+              'process' => level == DiagnosticLevel.normal,
+              _ => true,
+            };
+          }).toList()
+        : <AppLogEntry>[];
+    appEvents.sort(
+      (a, b) =>
+          _sortAscending ? a.time.compareTo(b.time) : b.time.compareTo(a.time),
+    );
 
     if (_sortAscending) {
       events.sort((a, b) => a.time.compareTo(b.time));
@@ -377,7 +449,7 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
     }
     return Scaffold(
       appBar: AppBar(
-        title: const Text('日志记录'),
+        title: const Text('诊断中心'),
         actions: [
           IconButton(
             tooltip: '刷新日志',
@@ -392,7 +464,9 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
               } else if (value == 'copy') {
                 await _refresh();
                 if (_report != null) {
-                  await Clipboard.setData(ClipboardData(text: _report!.text()));
+                  await Clipboard.setData(
+                    ClipboardData(text: await _fullText()),
+                  );
                   if (context.mounted) {
                     ScaffoldMessenger.of(
                       context,
@@ -400,15 +474,16 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
                   }
                 }
               } else if (value == 'clear') {
-                await _action(
-                  () => ref.read(automationBridgeProvider).clearDiagnostics(),
-                );
+                await _action(() async {
+                  await ref.read(automationBridgeProvider).clearDiagnostics();
+                  await _appLogger.clear();
+                });
               }
             },
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'copy', child: Text('复制完整日志')),
               PopupMenuItem(value: 'export', child: Text('导出日志文件')),
-              PopupMenuItem(value: 'clear', child: Text('清空诊断日志')),
+              PopupMenuItem(value: 'clear', child: Text('清空全部诊断日志')),
             ],
           ),
         ],
@@ -428,7 +503,7 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
                           : Icons.receipt_long,
                     ),
                     title: Text(report.enabled ? '日志记录已开启' : '日志记录已关闭'),
-                    subtitle: const Text('记录全部诊断 · 保留48小时/400条'),
+                    subtitle: const Text('自动记账保留48小时/400条 · 应用日志保留14天/1000条'),
                     value: report.enabled,
                     onChanged: (value) => _action(
                       () => ref
@@ -559,7 +634,60 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
                     ),
                   ],
                 ),
-                _DiagnosticSummary(events: report.events),
+                _DiagnosticSummary(
+                  events: report.events,
+                  appEvents: _appEvents,
+                ),
+                if (appEvents.isNotEmpty)
+                  ExpansionTile(
+                    initiallyExpanded: _source == 'app',
+                    leading: const Icon(Icons.apps_outlined),
+                    title: Text('应用日志 · ${appEvents.length} 条'),
+                    subtitle: const Text('启动、数据库、界面与手动记账'),
+                    children: [
+                      for (final event in appEvents)
+                        Card(
+                          margin: const EdgeInsets.fromLTRB(12, 5, 12, 5),
+                          child: ExpansionTile(
+                            leading: Icon(
+                              _diagnosticIcon(_appLevel(event.level)),
+                              color: _diagnosticColor(
+                                context,
+                                _appLevel(event.level),
+                              ),
+                            ),
+                            title: Text(
+                              event.message,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${event.time.toIso8601String().replaceFirst("T", " ")} · ${_appArea(event.area)}',
+                            ),
+                            childrenPadding: const EdgeInsets.fromLTRB(
+                              16,
+                              2,
+                              16,
+                              10,
+                            ),
+                            children: [
+                              _DiagnosticDetail(
+                                icon: Icons.code,
+                                title: '技术信息',
+                                text: [
+                                  '事件码 ${event.code}',
+                                  if (event.correlationId.isNotEmpty)
+                                    '关联编号 ${event.correlationId}',
+                                  if (event.technical.isNotEmpty)
+                                    event.technical,
+                                ].join(' · '),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
                   child: Row(
@@ -571,6 +699,7 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
                           value: _wechatOnly ? 'wechat' : _source,
                           options: const {
                             'all': '全部来源',
+                            'app': '应用日志',
                             'notification': '通知',
                             'accessibility': '无障碍',
                             'wechat': '微信及后台',

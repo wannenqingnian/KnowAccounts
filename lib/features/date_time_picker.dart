@@ -19,8 +19,8 @@ Future<DateTime?> showSecondDateTimePicker(
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setDialogState) => AlertDialog(
         title: const Text('选择记账时间'),
-        content: SizedBox(
-          width: 360,
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -119,6 +119,7 @@ Future<DateTime?> showSecondDateTimePicker(
               Text(
                 dateTimeLabel(value),
                 textAlign: TextAlign.center,
+                softWrap: true,
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ],
@@ -154,7 +155,10 @@ class _TimeUnit extends StatelessWidget {
   Widget build(BuildContext context) => DropdownButtonFormField<int>(
     initialValue: value,
     isExpanded: true,
-    decoration: const InputDecoration(isDense: true),
+    decoration: const InputDecoration(
+      isDense: true,
+      contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+    ),
     items: List.generate(
       count,
       (index) => DropdownMenuItem(

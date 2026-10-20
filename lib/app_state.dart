@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'data/ledger_repository.dart';
@@ -7,6 +9,8 @@ import 'domain/attachment.dart';
 import 'domain/appearance.dart';
 import 'transaction/parser/transaction_parser.dart';
 import 'transaction/transaction_identity.dart';
+import 'transaction/transaction_pipeline.dart';
+import 'core/logging/app_logger.dart';
 
 final repositoryProvider = Provider<LedgerRepository>(
   (ref) => throw UnimplementedError(),
@@ -91,6 +95,15 @@ class LedgerController extends ChangeNotifier {
     } catch (e) {
       if (_disposed || generation != _generation) return;
       error = e is LedgerException ? e.message : '数据读取失败，请重试';
+      unawaited(
+        AppLogger.instance.error(
+          'database',
+          'ledger_load_failed',
+          '账本数据读取失败',
+          error: e,
+          correlationId: 'load-$generation',
+        ),
+      );
     } finally {
       if (!_disposed && generation == _generation) {
         loading = false;
@@ -121,44 +134,86 @@ class LedgerController extends ChangeNotifier {
     List<ImageAttachment>? attachments,
     bool allowPossibleDuplicate = false,
   }) async {
+    final correlationId =
+        'tx-${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
+    unawaited(
+      AppLogger.instance.info(
+        'transaction',
+        'save_started',
+        draftId == null ? '开始保存账单' : '开始确认待处理账单',
+        correlationId: correlationId,
+      ),
+    );
     final ledger = ledgerId;
-    final draftLedger = draftId == null
-        ? null
-        : await repository.draftLedger(draftId);
-    if (draftId != null) {
-      await repository.db.transaction(() async {
-        final targetLedger = draftLedger ?? ledger;
-        final posted = await repository.confirmDraft(
-          targetLedger,
-          draftId,
-          input,
-        );
-        if (attachments != null) {
-          await repository.replaceAttachments(
+    try {
+      final draftLedger = draftId == null
+          ? null
+          : await repository.draftLedger(draftId);
+      if (draftId != null) {
+        await repository.db.transaction(() async {
+          final targetLedger = draftLedger ?? ledger;
+          final posted = await repository.confirmDraft(
             targetLedger,
-            posted,
-            attachments,
+            draftId,
+            input,
           );
-        }
-      });
-    } else {
-      final result = await repository.submitStructuredTransaction(
-        ledger,
-        input,
-        id: id,
-        attachments: attachments,
-        allowPossibleDuplicate: allowPossibleDuplicate,
-        identitySeed: TransactionIdentitySeed(
-          source: TransactionEvidenceSource.manual,
-          sourceApp: 'smart_ledger.manual',
-          captureId: id == null ? '' : 'manual-edit:$id',
-          details: const {'入口': '手动表单'},
+          if (attachments != null) {
+            await repository.replaceAttachments(
+              targetLedger,
+              posted,
+              attachments,
+            );
+          }
+        });
+      } else {
+        final result = await repository.submitStructuredTransaction(
+          ledger,
+          input,
+          id: id,
+          attachments: attachments,
+          allowPossibleDuplicate: allowPossibleDuplicate,
+          identitySeed: TransactionIdentitySeed(
+            source: TransactionEvidenceSource.manual,
+            sourceApp: 'smart_ledger.manual',
+            captureId: id == null ? '' : 'manual-edit:$id',
+            details: const {'入口': '手动表单'},
+          ),
+        );
+        ledgerId = result.ledgerId;
+      }
+      if (draftLedger != null) ledgerId = draftLedger;
+      await load();
+      unawaited(
+        AppLogger.instance.success(
+          'transaction',
+          'save_completed',
+          draftId == null ? '账单保存成功' : '待处理账单确认成功',
+          correlationId: correlationId,
         ),
       );
-      ledgerId = result.ledgerId;
+    } on PossibleDuplicateTransactionException catch (error, stackTrace) {
+      unawaited(
+        AppLogger.instance.warning(
+          'transaction',
+          'possible_duplicate',
+          '检测到疑似重复账单，等待用户确认',
+          correlationId: correlationId,
+        ),
+      );
+      Error.throwWithStackTrace(error, stackTrace);
+    } catch (error, stackTrace) {
+      unawaited(
+        AppLogger.instance.error(
+          'transaction',
+          'save_failed',
+          '账单保存失败',
+          error: error,
+          stackTrace: stackTrace,
+          correlationId: correlationId,
+        ),
+      );
+      rethrow;
     }
-    if (draftLedger != null) ledgerId = draftLedger;
-    await load();
   }
 
   Future<void> setAmountPrivacy(bool enabled) async {
