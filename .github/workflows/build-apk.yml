@@ -53,10 +53,6 @@ jobs:
           flutter test --no-pub test/transaction_location_test.dart
           flutter test --no-pub test/ocr_manual_test.dart
 
-      - name: Verify Android diagnostic privacy policy
-        working-directory: android
-        run: ./gradlew -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.accessibilityReceiptProducesUsefulMaskedDiagnosticFields --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.recognizedFieldsAreAllowlistedAndMasked
-
       - name: Restore Android signing key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -80,6 +76,10 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
         run: flutter build apk --release --target-platform android-arm64
+
+      - name: Verify Android diagnostic privacy policy
+        working-directory: android
+        run: bash ./gradlew -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.accessibilityReceiptProducesUsefulMaskedDiagnosticFields --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.recognizedFieldsAreAllowlistedAndMasked
 
       - name: Verify release JNI libraries
         run: python3 tool/verify_ocr_jni_apk.py build/app/outputs/flutter-apk/app-release.apk
