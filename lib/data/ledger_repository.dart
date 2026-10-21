@@ -19,6 +19,14 @@ import '../transaction/auto_correction.dart';
 import '../transaction/transaction_identity.dart';
 import '../transaction/transaction_pipeline.dart';
 
+/// Cross-source receipts often shorten one merchant (for example “瑞幸” versus
+/// “瑞幸咖啡”). Treat missing/contained names as compatible only inside the
+/// narrow amount/time duplicate window, never as proof for a silent merge.
+bool _merchantEvidenceCompatible(String normalized, String other) {
+  if (normalized.isEmpty || other.isEmpty || normalized == other) return true;
+  return normalized.contains(other) || other.contains(normalized);
+}
+
 class LedgerRepository {
   LedgerRepository(this.db, {this.cardVault});
   final AppDatabase db;
@@ -2217,6 +2225,7 @@ class LedgerRepository {
       final values = [
         input.type.name,
         money.baseAmount,
+        input.discountMinor,
         input.accountId,
         target,
         category,
@@ -2233,14 +2242,14 @@ class LedgerRepository {
       if (id == null) {
         await db.customStatement(
           '''INSERT INTO transactions
-          (type, amount_minor, account_id, target_account_id, category_id, merchant, note,
+          (type, amount_minor, discount_minor, account_id, target_account_id, category_id, merchant, note,
            occurred_date, related_transaction_id, reimbursable, updated_at, device_id, tags_json, is_reimbursement, id, ledger_id, created_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
           [...values, transactionId, ledger, now],
         );
       } else {
         await db.customStatement(
-          '''UPDATE transactions SET type = ?, amount_minor = ?, account_id = ?,
+          '''UPDATE transactions SET type = ?, amount_minor = ?, discount_minor = ?, account_id = ?,
           target_account_id = ?, category_id = ?, merchant = ?, note = ?, occurred_date = ?,
           related_transaction_id = ?, reimbursable = ?, updated_at = ?, device_id = ?, tags_json = ?, is_reimbursement = ?, version = version + 1
           WHERE id = ?''',
@@ -2408,6 +2417,7 @@ class LedgerRepository {
     final correctedInput = TransactionInput(
       type: input.type,
       amountMinor: input.amountMinor,
+      discountMinor: input.discountMinor,
       accountId: effectiveDraft.accountId ?? input.accountId,
       targetAccountId: input.targetAccountId,
       categoryId: effectiveDraft.categoryId ?? input.categoryId,
@@ -3921,6 +3931,7 @@ class LedgerRepository {
             id: r.read('id'),
             type: TransactionType.values.byName(r.read('type')),
             amountMinor: r.read('amount_minor'),
+            discountMinor: r.readNullable<int>('discount_minor'),
             accountId: r.read('account_id'),
             accountName: r.read('account_name'),
             targetAccountId: r.readNullable('target_account_id'),
@@ -4031,31 +4042,47 @@ class LedgerRepository {
       return const TransactionDuplicateAssessment();
     }
     final all = await entries(ledger);
-    final orderRows = await _query(
-      '''SELECT DISTINCT order_hash FROM transaction_evidence_records
-      WHERE ledger_id=? AND draft_id=? AND order_hash IS NOT NULL''',
+    final fingerprintRows = await _query(
+      '''SELECT DISTINCT order_hash, semantic_fingerprint
+      FROM transaction_evidence_records WHERE ledger_id=? AND draft_id=?''',
       [ledger, draftId],
     );
-    final orders = orderRows
-        .map((row) => row.read<String>('order_hash'))
+    final orders = fingerprintRows
+        .map((row) => row.readNullable<String>('order_hash'))
+        .whereType<String>()
+        .toSet();
+    final semantics = fingerprintRows
+        .map((row) => row.readNullable<String>('semantic_fingerprint'))
+        .whereType<String>()
+        .where((value) => value.isNotEmpty)
         .toSet();
     LedgerEntry? candidate;
     var matchedByOrder = false;
-    if (orders.isNotEmpty) {
-      final placeholders = List.filled(orders.length, '?').join(',');
+    var matchBasis = '';
+    Future<LedgerEntry?> postedFor(String column, Set<String> values) async {
+      if (values.isEmpty) return null;
+      final placeholders = List.filled(values.length, '?').join(',');
       final rows = await _query(
         '''SELECT DISTINCT e.transaction_id FROM transaction_evidence_records e
         JOIN transactions t ON t.id=e.transaction_id
-        WHERE e.ledger_id=? AND e.order_hash IN ($placeholders)
+        WHERE e.ledger_id=? AND e.$column IN ($placeholders)
           AND e.transaction_id IS NOT NULL AND t.deleted_at IS NULL
           AND t.type IN ('expense','income') ORDER BY t.created_at LIMIT 2''',
-        [ledger, ...orders],
+        [ledger, ...values],
       );
-      if (rows.isNotEmpty) {
-        final id = rows.first.read<String>('transaction_id');
-        candidate = all.where((item) => item.id == id).firstOrNull;
-        matchedByOrder = candidate != null;
-      }
+      if (rows.isEmpty) return null;
+      final id = rows.first.read<String>('transaction_id');
+      return all.where((item) => item.id == id).firstOrNull;
+    }
+
+    if (orders.isNotEmpty) {
+      candidate = await postedFor('order_hash', orders);
+      matchedByOrder = candidate != null;
+      if (candidate != null) matchBasis = 'order';
+    }
+    if (candidate == null && semantics.isNotEmpty) {
+      candidate = await postedFor('semantic_fingerprint', semantics);
+      if (candidate != null) matchBasis = 'semantic';
     }
     final normalized = UnifiedTransactionIdentity.normalizeMerchant(
       input.merchant,
@@ -4073,6 +4100,35 @@ class LedgerRepository {
                     normalized,
           )
           .firstOrNull;
+      if (candidate != null) matchBasis = 'same_day';
+    }
+    // Notification/accessibility/OCR of one payment may omit the merchant. A
+    // short amount/account/direction window catches that cross-source copy
+    // while still leaving the draft for review instead of silently merging it.
+    if (candidate == null) {
+      bool compatibleMerchant(LedgerEntry item) {
+        final other = UnifiedTransactionIdentity.normalizeMerchant(
+          item.merchant,
+        );
+        return _merchantEvidenceCompatible(normalized, other);
+      }
+
+      candidate = all
+          .where(
+            (item) =>
+                item.type == input.type &&
+                item.amountMinor == input.amountMinor &&
+                (input.accountId.isEmpty ||
+                    item.accountId == input.accountId) &&
+                item.occurredDate
+                        .difference(input.occurredDate)
+                        .abs()
+                        .inMinutes <=
+                    5 &&
+                compatibleMerchant(item),
+          )
+          .firstOrNull;
+      if (candidate != null) matchBasis = 'amount_time';
     }
     if (candidate == null) return const TransactionDuplicateAssessment();
     final differences = <String>[];
@@ -4088,9 +4144,13 @@ class LedgerRepository {
     if (minutes > 10) differences.add('时间相差 $minutes 分钟');
     if (candidate.accountId != input.accountId) differences.add('账户不同');
     if (candidate.type != input.type) differences.add('收支方向不同');
+    if (matchBasis == 'amount_time') {
+      differences.add('商户证据不足，按金额、账户和 5 分钟内时间窗判断');
+    }
     return TransactionDuplicateAssessment(
       candidateTransactionId: candidate.id,
       matchedByOrder: matchedByOrder,
+      matchBasis: matchBasis,
       differences: List.unmodifiable(differences),
     );
   }
@@ -4125,22 +4185,34 @@ class LedgerRepository {
     )).where((item) => item.id != excludingTransactionId).toList();
     LedgerEntry? candidate;
     var matchedByOrder = false;
-    if (fingerprint.orderHash != null) {
+    var matchBasis = '';
+    Future<LedgerEntry?> postedFor(String column, String value) async {
       final rows = await _query(
         '''SELECT DISTINCT e.transaction_id FROM transaction_evidence_records e
         JOIN transactions t ON t.id=e.transaction_id
-        WHERE e.ledger_id=? AND e.order_hash=?
+        WHERE e.ledger_id=? AND e.$column=?
           AND e.transaction_id IS NOT NULL AND t.deleted_at IS NULL
           AND t.type IN ('expense','income')
           ${excludingTransactionId == null ? '' : 'AND e.transaction_id!=?'}
         ORDER BY t.created_at LIMIT 1''',
-        [ledger, fingerprint.orderHash!, ?excludingTransactionId],
+        [ledger, value, ?excludingTransactionId],
       );
-      if (rows.isNotEmpty) {
-        final candidateId = rows.single.read<String>('transaction_id');
-        candidate = all.where((item) => item.id == candidateId).firstOrNull;
-        matchedByOrder = candidate != null;
-      }
+      if (rows.isEmpty) return null;
+      final candidateId = rows.single.read<String>('transaction_id');
+      return all.where((item) => item.id == candidateId).firstOrNull;
+    }
+
+    if (fingerprint.orderHash != null) {
+      candidate = await postedFor('order_hash', fingerprint.orderHash!);
+      matchedByOrder = candidate != null;
+      if (candidate != null) matchBasis = 'order';
+    }
+    if (candidate == null && fingerprint.semanticHash.isNotEmpty) {
+      candidate = await postedFor(
+        'semantic_fingerprint',
+        fingerprint.semanticHash,
+      );
+      if (candidate != null) matchBasis = 'semantic';
     }
     final normalized = fingerprint.normalizedMerchant;
     if (candidate == null && normalized.isNotEmpty) {
@@ -4155,6 +4227,31 @@ class LedgerRepository {
                     normalized,
           )
           .firstOrNull;
+      if (candidate != null) matchBasis = 'same_day';
+    }
+    if (candidate == null) {
+      bool compatibleMerchant(LedgerEntry item) {
+        final other = UnifiedTransactionIdentity.normalizeMerchant(
+          item.merchant,
+        );
+        return _merchantEvidenceCompatible(normalized, other);
+      }
+
+      candidate = all
+          .where(
+            (item) =>
+                item.type == input.type &&
+                item.amountMinor == input.amountMinor &&
+                item.accountId == input.accountId &&
+                item.occurredDate
+                        .difference(input.occurredDate)
+                        .abs()
+                        .inMinutes <=
+                    5 &&
+                compatibleMerchant(item),
+          )
+          .firstOrNull;
+      if (candidate != null) matchBasis = 'amount_time';
     }
     if (candidate == null) return const TransactionDuplicateAssessment();
     final differences = <String>[];
@@ -4170,9 +4267,13 @@ class LedgerRepository {
     if (minutes > 10) differences.add('时间相差 $minutes 分钟');
     if (candidate.accountId != input.accountId) differences.add('账户不同');
     if (candidate.type != input.type) differences.add('收支方向不同');
+    if (matchBasis == 'amount_time') {
+      differences.add('商户证据不足，按金额、账户和 5 分钟内时间窗判断');
+    }
     return TransactionDuplicateAssessment(
       candidateTransactionId: candidate.id,
       matchedByOrder: matchedByOrder,
+      matchBasis: matchBasis,
       differences: List.unmodifiable(differences),
     );
   }

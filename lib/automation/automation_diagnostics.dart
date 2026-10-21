@@ -1,4 +1,5 @@
 import 'payment_apps.dart';
+import 'payment_quality.dart';
 
 const diagnosticLabels = <String, String>{
   'notification_connected': '通知监听服务已连接',
@@ -62,6 +63,11 @@ const diagnosticLabels = <String, String>{
   'worker_revoked': '采集授权已变化，未继续处理',
   'worker_posted': '账单已自动保存',
   'worker_pending': '账单已保留为待确认草稿',
+  'worker_duplicate_order': '疑似重复：订单号与已有账单一致',
+  'worker_duplicate_semantic': '疑似重复：商户、金额、账户和时间一致',
+  'worker_duplicate_same_day': '疑似重复：同日同商户同金额',
+  'worker_duplicate_time': '疑似重复：金额、账户和时间相近',
+  'worker_quality': '本次识别质量已评分',
   'worker_repeated': '已有本次采集的草稿或账单',
   'worker_discarded': '目标账本不存在，采集未入账',
   'worker_finish': '本轮后台处理完成',
@@ -142,7 +148,17 @@ class DiagnosticEvent {
   final String code, app, source, reference;
   final Map<String, String> fields;
   String get label => diagnosticLabels[code]!;
+  PaymentQuality? get quality =>
+      code == 'worker_quality' ? PaymentQuality.tryParse(fields) : null;
   String get recognizedText => fields.entries
+      .where(
+        (item) => const {
+          'amount',
+          'merchant',
+          'account',
+          'category',
+        }.contains(item.key),
+      )
       .map(
         (item) =>
             '${switch (item.key) {
@@ -191,6 +207,7 @@ class DiagnosticEvent {
         '${count == 0 ? "" : " | 数量 $count"}'
         '${repeats <= 1 ? "" : " | 合并重复 $repeats 次"}'
         '${recognized.isEmpty ? "" : " | 识别：$recognized"}'
+        '${quality == null ? "" : " | 质量 ${quality!.score} 分 ${quality!.summary}"}'
         ' | 事件码 $code\n';
   }
 
@@ -506,6 +523,46 @@ class DiagnosticEvent {
       action: '请在确认表单中补充完整。',
       level: DiagnosticLevel.success,
     ),
+    'worker_duplicate_order' => const DiagnosticExplanation(
+      what: '查重命中：页面订单号与已有账单相同。',
+      result: '已阻断自动入账，草稿留在待确认。',
+      action: '确认是同一笔就忽略；若确为两笔，请核对订单号后手动保存。',
+      level: DiagnosticLevel.warning,
+    ),
+    'worker_duplicate_semantic' => const DiagnosticExplanation(
+      what: '查重命中：商户、金额、账户、方向和相近时间与已有账单一致。',
+      result: '已阻断自动入账，草稿留在待确认。',
+      action: '确认是同一笔就忽略；若确为两笔，可在待确认中手动保存。',
+      level: DiagnosticLevel.warning,
+    ),
+    'worker_duplicate_same_day' => const DiagnosticExplanation(
+      what: '查重命中：同一天、同商户、同账户、同金额和同方向已有账单。',
+      result: '已阻断自动入账，草稿留在待确认。',
+      action: '确认是同一笔就忽略；若确为两笔，可在待确认中手动保存。',
+      level: DiagnosticLevel.warning,
+    ),
+    'worker_duplicate_time' => const DiagnosticExplanation(
+      what: '商户没有识别完整，但金额、账户、方向和 5 分钟内时间窗与已有账单一致。',
+      result: '为避免重复记账，已阻断自动入账并保留草稿。',
+      action: '请打开待确认账单，核对商户或订单号后决定保存或忽略。',
+      level: DiagnosticLevel.warning,
+    ),
+    'worker_quality' => DiagnosticExplanation(
+      what: '已把解析结果与实际入账字段逐项对照。',
+      result: quality == null
+          ? '评分字段不完整，暂无法判断。'
+          : '识别质量 ${quality!.score} 分 · ${quality!.grade}。${quality!.summary}',
+      action: quality == null
+          ? '请导出日志继续排查。'
+          : quality!.needsReview
+          ? '低分表示分类、账户或金额被修正过，建议在待确认账单中复核。'
+          : '各字段一致性良好，无需额外处理。',
+      level: quality == null
+          ? DiagnosticLevel.normal
+          : quality!.needsReview
+          ? DiagnosticLevel.warning
+          : DiagnosticLevel.success,
+    ),
     'worker_repeated' => const DiagnosticExplanation(
       what: '发现重复采集。',
       result: '未重复保存。',
@@ -641,6 +698,229 @@ class DiagnosticEvent {
         : '后台/系统';
     return name == null ? kind : '$name · $kind';
   }
+}
+
+enum PaymentLogOutcome {
+  posted,
+  pending,
+  duplicate,
+  repeated,
+  skipped,
+  processing,
+}
+
+/// One transaction-sized view of the technical trace.
+///
+/// The raw event list is intentionally code-oriented. Users need to know
+/// “what happened to this payment”, so events sharing a capture reference are
+/// folded into a single record with a plain-language result and next action.
+class PaymentLogRecord {
+  const PaymentLogRecord({
+    required this.reference,
+    required this.time,
+    required this.outcome,
+    required this.events,
+    required this.decisive,
+    this.amount = '',
+    this.merchant = '',
+    this.account = '',
+    this.category = '',
+    this.quality,
+  });
+
+  final String reference;
+  final int time;
+  final PaymentLogOutcome outcome;
+  final List<DiagnosticEvent> events;
+  final DiagnosticEvent decisive;
+  final String amount, merchant, account, category;
+  final PaymentQuality? quality;
+
+  bool get needsAttention =>
+      outcome == PaymentLogOutcome.pending ||
+      outcome == PaymentLogOutcome.duplicate ||
+      outcome == PaymentLogOutcome.skipped;
+
+  String get title => switch (outcome) {
+    PaymentLogOutcome.posted => '已自动入账',
+    PaymentLogOutcome.pending => '待确认账单',
+    PaymentLogOutcome.duplicate => '疑似重复，已拦下',
+    PaymentLogOutcome.repeated => '重复采集，已跳过',
+    PaymentLogOutcome.skipped => '未生成账单',
+    PaymentLogOutcome.processing => '处理中',
+  };
+
+  String get subtitle => [
+    if (amount.isNotEmpty) '¥$amount',
+    if (merchant.isNotEmpty) merchant,
+    if (account.isNotEmpty) account,
+    if (category.isNotEmpty) category,
+  ].join(' · ');
+
+  String get reason {
+    if (outcome == PaymentLogOutcome.posted) {
+      return '已按实付金额入账，余额和报表已更新。';
+    }
+    if (outcome == PaymentLogOutcome.repeated) {
+      return '通知、无障碍或 OCR 重复采集了同一笔支付，没有再次入账。';
+    }
+    if (outcome == PaymentLogOutcome.duplicate) {
+      return decisive.explanation.what;
+    }
+    if (outcome == PaymentLogOutcome.pending) {
+      if (quality?.needsReview == true) {
+        return '识别质量 ${quality!.score} 分：${quality!.summary}';
+      }
+      DiagnosticEvent? warning;
+      for (final event in events) {
+        if (const {
+          'amount_missing',
+          'account_missing',
+          'category_missing',
+          'peer_review',
+          'warning_review',
+          'overlay_denied',
+          'overlay_failed',
+        }.contains(event.code)) {
+          warning = event;
+        }
+      }
+      return warning?.explanation.what ?? '字段不完整或置信度不足，暂未自动入账。';
+    }
+    if (outcome == PaymentLogOutcome.skipped) {
+      return decisive.explanation.what;
+    }
+    return '后台已收到采集，尚未返回最终结果。';
+  }
+
+  String get action {
+    if (decisive.explanation.action.isNotEmpty) {
+      return decisive.explanation.action;
+    }
+    return switch (outcome) {
+      PaymentLogOutcome.posted => '无需操作，可在流水中查看或编辑。',
+      PaymentLogOutcome.pending => '到“待确认账单”核对并保存。',
+      PaymentLogOutcome.duplicate => '确认是同一笔就忽略；确为两笔时可在待确认中手动保存。',
+      PaymentLogOutcome.repeated => '无需操作。',
+      PaymentLogOutcome.skipped => '打开支付成功页或账单详情页后重试。',
+      PaymentLogOutcome.processing => '稍等片刻；长时间无结果可点上方刷新。',
+    };
+  }
+
+  DiagnosticLevel get level => switch (outcome) {
+    PaymentLogOutcome.posted => DiagnosticLevel.success,
+    PaymentLogOutcome.duplicate ||
+    PaymentLogOutcome.skipped => DiagnosticLevel.warning,
+    PaymentLogOutcome.pending => DiagnosticLevel.warning,
+    PaymentLogOutcome.repeated => DiagnosticLevel.normal,
+    PaymentLogOutcome.processing => DiagnosticLevel.progress,
+  };
+
+  String get readableTime => DateTime.fromMillisecondsSinceEpoch(
+    time,
+  ).toLocal().toIso8601String().replaceFirst('T', ' ');
+
+  String get exportText => [
+    '$readableTime · $title',
+    if (subtitle.isNotEmpty) '识别：$subtitle',
+    '原因：$reason',
+    '下一步：$action',
+    if (quality != null) '识别质量：${quality!.score} 分 · ${quality!.summary}',
+    '技术过程：${events.map((event) => event.code).join(' → ')}',
+  ].join('\n');
+
+  static List<PaymentLogRecord> fromEvents(List<DiagnosticEvent> source) {
+    final groups = <String, List<DiagnosticEvent>>{};
+    for (final event in source) {
+      if (event.reference.isEmpty) continue;
+      groups.putIfAbsent(event.reference, () => []).add(event);
+    }
+    final records = <PaymentLogRecord>[];
+    for (final entry in groups.entries) {
+      final events = [...entry.value]..sort((a, b) => a.time.compareTo(b.time));
+      final outcome = _outcome(events);
+      if (outcome == null) continue;
+      final decisive = events.lastWhere(
+        (event) => _codeOutcome(event.code) == outcome,
+        orElse: () => events.last,
+      );
+      String field(String key) {
+        for (final event in events.reversed) {
+          final value = event.fields[key];
+          if (value != null && value.isNotEmpty) return value;
+        }
+        return '';
+      }
+
+      PaymentQuality? quality;
+      for (final event in events) {
+        if (event.quality != null) quality = event.quality;
+      }
+      records.add(
+        PaymentLogRecord(
+          reference: entry.key,
+          time: decisive.time,
+          outcome: outcome,
+          events: events,
+          decisive: decisive,
+          amount: field('amount'),
+          merchant: field('merchant'),
+          account: field('account'),
+          category: field('category'),
+          quality: quality,
+        ),
+      );
+    }
+    records.sort((a, b) => b.time.compareTo(a.time));
+    return records;
+  }
+
+  static PaymentLogOutcome? _outcome(List<DiagnosticEvent> events) {
+    final outcomes = events.map((event) => _codeOutcome(event.code)).toSet();
+    for (final outcome in const [
+      PaymentLogOutcome.posted,
+      PaymentLogOutcome.duplicate,
+      PaymentLogOutcome.repeated,
+      PaymentLogOutcome.pending,
+      PaymentLogOutcome.skipped,
+      PaymentLogOutcome.processing,
+    ]) {
+      if (outcomes.contains(outcome)) return outcome;
+    }
+    return null;
+  }
+
+  static PaymentLogOutcome? _codeOutcome(String code) => switch (code) {
+    'worker_posted' || 'form_saved' => PaymentLogOutcome.posted,
+    'worker_duplicate_order' ||
+    'worker_duplicate_semantic' ||
+    'worker_duplicate_same_day' ||
+    'worker_duplicate_time' ||
+    'form_duplicate' => PaymentLogOutcome.duplicate,
+    'worker_repeated' || 'replay_skipped' => PaymentLogOutcome.repeated,
+    'worker_pending' ||
+    'overlay_expanded' ||
+    'overlay_collapsed' ||
+    'overlay_queued' => PaymentLogOutcome.pending,
+    'worker_discarded' ||
+    'no_payment_match' ||
+    'fields_missing' ||
+    'money_missing' ||
+    'success_missing' ||
+    'state_unsupported' ||
+    'ocr_no_match' ||
+    'quick_ocr_failed' ||
+    'empty_content' ||
+    'too_long' => PaymentLogOutcome.skipped,
+    'queued' ||
+    'worker_take' ||
+    'worker_quality' ||
+    'confidence_high' ||
+    'confidence_review' ||
+    'confidence_low' ||
+    'form_submitted' => PaymentLogOutcome.processing,
+    _ => null,
+  };
 }
 
 /// Both display and export rebuild an allowlisted report, never stringify the bridge payload.

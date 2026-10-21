@@ -71,6 +71,7 @@ class TransactionEditor extends ConsumerStatefulWidget {
 class _TransactionEditorState extends ConsumerState<TransactionEditor> {
   final _form = GlobalKey<FormState>();
   late final TextEditingController _amount;
+  late final TextEditingController _discount;
   late final TextEditingController _merchant;
   late final TextEditingController _note;
   late final TextEditingController _tags;
@@ -155,6 +156,14 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
               template.amountMinor,
               decimals: initialAccount?.currencyDecimals ?? 2,
             )
+          : '',
+    );
+    final initialDiscount =
+        entry?.discountMinor ??
+        int.tryParse(draft?.evidence['discount_minor'] ?? '');
+    _discount = TextEditingController(
+      text: initialDiscount != null && initialDiscount > 0
+          ? amountText(initialDiscount, decimals: 2)
           : '',
     );
     _merchant = TextEditingController(
@@ -361,6 +370,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
   @override
   void dispose() {
     _amount.dispose();
+    _discount.dispose();
     _merchant.dispose();
     _note.dispose();
     _tags.dispose();
@@ -425,22 +435,36 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
       setState(() => _error = "账本已变化，请重新打开记账表单");
       return;
     }
+    final decimals =
+        ref
+            .read(ledgerProvider)
+            .accounts
+            .where((account) => account.id == _account)
+            .firstOrNull
+            ?.currencyDecimals ??
+        2;
+    final amountMinor = parseMinorUnits(_amount.text, decimals);
+    final parsedDiscount = _discount.text.trim().isEmpty
+        ? null
+        : parseMinorUnits(_discount.text, decimals);
+    if (parsedDiscount != null && parsedDiscount > amountMinor) {
+      setState(() => _error = '优惠不能大于实付金额');
+      return;
+    }
+    final discountMinor =
+        _type == TransactionType.expense &&
+            parsedDiscount != null &&
+            parsedDiscount > 0
+        ? parsedDiscount
+        : null;
     setState(() {
       _saving = true;
       _error = null;
     });
     final input = TransactionInput(
       type: _type,
-      amountMinor: parseMinorUnits(
-        _amount.text,
-        ref
-                .read(ledgerProvider)
-                .accounts
-                .where((account) => account.id == _account)
-                .firstOrNull
-                ?.currencyDecimals ??
-            2,
-      ),
+      amountMinor: amountMinor,
+      discountMinor: discountMinor,
       accountId: _account!,
       targetAccountId: _type == TransactionType.transfer ? _target : null,
       categoryId: _category,
@@ -590,6 +614,7 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
             nextCurrency != null &&
             oldCurrency != nextCurrency) {
           _amount.clear();
+          _discount.clear();
         }
       });
     }
@@ -1006,6 +1031,43 @@ class _TransactionEditorState extends ConsumerState<TransactionEditor> {
                                   border: InputBorder.none,
                                 ),
                               ),
+                              if (_type == TransactionType.expense) ...[
+                                const Divider(height: 1),
+                                TextFormField(
+                                  key: const ValueKey('transaction_discount'),
+                                  controller: _discount,
+                                  enabled: !_saving,
+                                  keyboardType:
+                                      const TextInputType.numberWithOptions(
+                                        decimal: true,
+                                      ),
+                                  decoration: InputDecoration(
+                                    icon: Icon(
+                                      Icons.local_offer_outlined,
+                                      color: primary,
+                                    ),
+                                    labelText: '优惠（选填）',
+                                    prefixText: '¥ ',
+                                    hintText: '例如 3.00',
+                                    helperText: '实付金额保持不变，优惠单独记录',
+                                    border: InputBorder.none,
+                                  ),
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return null;
+                                    }
+                                    try {
+                                      parseMinorUnits(
+                                        value,
+                                        selectedAccount?.currencyDecimals ?? 2,
+                                      );
+                                      return null;
+                                    } catch (e) {
+                                      return e.toString();
+                                    }
+                                  },
+                                ),
+                              ],
                               Align(
                                 alignment: Alignment.centerLeft,
                                 child: Wrap(

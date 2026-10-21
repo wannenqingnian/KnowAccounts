@@ -20,7 +20,7 @@ class AppDatabase extends GeneratedDatabase {
   }
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
   @override
   Iterable<TableInfo<Table, Object?>> get allTables => const [];
   @override
@@ -203,6 +203,16 @@ class AppDatabase extends GeneratedDatabase {
         }
         for (final sql in knowledgeSchemaStatements) {
           await customStatement(sql);
+        }
+      }
+      if (from < 17) {
+        final transactionColumns = (await customSelect(
+          'PRAGMA table_info(transactions)',
+        ).get()).map((row) => row.read<String>('name')).toSet();
+        if (!transactionColumns.contains('discount_minor')) {
+          await customStatement(
+            'ALTER TABLE transactions ADD COLUMN discount_minor INTEGER CHECK(discount_minor IS NULL OR discount_minor >= 0)',
+          );
         }
       }
       await customStatement('''INSERT OR IGNORE INTO currencies
@@ -634,6 +644,7 @@ const schemaStatements = [
     id TEXT PRIMARY KEY, ledger_id TEXT NOT NULL REFERENCES ledgers(id),
     type TEXT NOT NULL CHECK(type IN ('expense','income','transfer','refund','adjustment')),
     amount_minor INTEGER NOT NULL CHECK(amount_minor > 0),
+    discount_minor INTEGER CHECK(discount_minor IS NULL OR discount_minor >= 0),
     currency TEXT NOT NULL DEFAULT 'CNY' CHECK(currency = 'CNY'),
     account_id TEXT NOT NULL REFERENCES accounts(id),
     target_account_id TEXT REFERENCES accounts(id),

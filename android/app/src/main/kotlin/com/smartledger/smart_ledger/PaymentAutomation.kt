@@ -194,6 +194,10 @@ object PaymentAutomation {
                                     "category" to selectedName("categories", "categoryId"),
                                 ),
                             )
+                            val quality = call.argument<Map<String,Any?>>("quality")
+                            if (quality != null) {
+                                PaymentTrace.event(context, "worker_quality", ref=id ?: "", fields=quality)
+                            }
                             writeQueue(context, next)
                             val p = prefs(context); val edit = p.edit().putLong("lastTime", System.currentTimeMillis()).putBoolean("error", false)
                             if (outcome in listOf("posted", "pending")) edit.putInt(outcome!!, p.getInt(outcome, 0) + 1)

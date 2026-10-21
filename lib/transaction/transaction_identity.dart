@@ -118,16 +118,26 @@ class TransactionDuplicateAssessment {
     this.candidateTransactionId,
     this.matchedByOrder = false,
     this.differences = const [],
+    this.matchBasis = '',
   });
 
   final String? candidateTransactionId;
   final bool matchedByOrder;
   final List<String> differences;
+
+  /// Stable user-facing basis: order, semantic, amount-time or same-day.
+  final String matchBasis;
   bool get possible => candidateTransactionId != null;
 
   String get message {
     if (!possible) return '';
-    final basis = matchedByOrder ? '订单号与已有账单一致' : '金额、商户、日期和方向相符';
+    final basis = switch (matchBasis) {
+      'order' => '订单号与已有账单一致',
+      'semantic' => '商户、金额、账户、方向和相近时间一致',
+      'amount_time' => '金额、账户、方向和相近时间一致（商户证据不足）',
+      'same_day' => '金额、商户、账户、方向和日期一致',
+      _ => matchedByOrder ? '订单号与已有账单一致' : '金额、商户、日期和方向相符',
+    };
     return differences.isEmpty ? basis : '$basis；证据差异：${differences.join('；')}';
   }
 }

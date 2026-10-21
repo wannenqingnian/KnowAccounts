@@ -47,11 +47,21 @@ jobs:
       - name: Fetch Flutter dependencies
         run: flutter pub get
 
+      - name: Analyze Flutter source
+        run: flutter analyze --no-pub
+
       - name: Verify diagnostics and location regressions
         run: |
           flutter test --no-pub --concurrency=1 test/automation_diagnostics_test.dart
           flutter test --no-pub test/transaction_location_test.dart
           flutter test --no-pub test/ocr_manual_test.dart
+
+      - name: Verify transaction and discount regressions
+        shell: bash
+        run: |
+          for test_file in payment_automation payment_confirmation payment_worker payment_quality discount_migration backup advanced_finance transaction_identity; do
+            flutter test --no-pub --concurrency=1 "test/${test_file}_test.dart"
+          done
 
       - name: Restore Android signing key
         env:

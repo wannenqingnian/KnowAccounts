@@ -21,6 +21,33 @@ void main() {
   tearDown(() => db.close());
 
   test(
+    'discount persists as extra evidence without changing the paid amount',
+    () async {
+      final account = (await ledger.accounts(
+        'personal',
+      )).firstWhere((value) => value.currency == 'CNY');
+      final category = (await ledger.categories(
+        'personal',
+      )).firstWhere((value) => value.type == TransactionType.expense);
+      await ledger.save(
+        'personal',
+        TransactionInput(
+          type: TransactionType.expense,
+          amountMinor: 3850,
+          discountMinor: 350,
+          accountId: account.id,
+          categoryId: category.id,
+          occurredDate: DateTime(2026, 10, 13, 12, 30),
+          merchant: '瑞幸咖啡',
+        ),
+      );
+      final entry = (await ledger.entries('personal')).single;
+      expect(entry.amountMinor, 3850);
+      expect(entry.discountMinor, 350);
+      expect(entry.merchant, '瑞幸咖啡');
+    },
+  );
+  test(
     'foreign account keeps original amount and base CNY conversion',
     () async {
       await finance.saveCurrency(

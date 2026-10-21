@@ -72,7 +72,16 @@ Future<void> runPaymentAutomationWorker({
         continue;
       }
       await _trace('worker_take', capture);
-      final outcome = await processor.process(capture);
+      final result = await processor.processWithQuality(capture);
+      final outcome = result.outcome;
+      if (result.duplicateBasis.isNotEmpty) {
+        await _trace(switch (result.duplicateBasis) {
+          'order' => 'worker_duplicate_order',
+          'semantic' => 'worker_duplicate_semantic',
+          'amount_time' => 'worker_duplicate_time',
+          _ => 'worker_duplicate_same_day',
+        }, capture);
+      }
       final confidence = await repository.draftConfidence('auto-${capture.id}');
       if (confidence != null) {
         await _trace(
@@ -104,6 +113,7 @@ Future<void> runPaymentAutomationWorker({
         'kind': capture.kind,
         'outcome': outcome,
         'preview': ?preview,
+        'quality': ?result.quality?.toTraceFields(),
       });
     }
     ok = true;

@@ -103,9 +103,9 @@ void main() {
       );
       expect(child['parentId'], isNotEmpty);
       expect(
-        previewCategories.firstWhere(
-          (category) => category['id'] == child['parentId'],
-        ).containsKey('parentId'),
+        previewCategories
+            .firstWhere((category) => category['id'] == child['parentId'])
+            .containsKey('parentId'),
         false,
       );
       final first = await confirmPayment(repo, command('a'));
@@ -122,6 +122,17 @@ void main() {
       expect(await paymentPreview(repo, event), isNull);
     },
   );
+  test('overlay confirmation keeps the pending draft discount', () async {
+    final event = capture(
+      'e',
+      text:
+          '交易详情\n精品沙县小吃\n-16.00\n已优惠 3.50元\n当前状态 支付成功\n支付方式 零钱\n支付时间 2026年10月05日 12:05:15',
+    );
+    await PaymentCaptureProcessor(repo).process(event, now: time);
+    final result = await confirmPayment(repo, command('e'));
+    expect(result.ok, true, reason: result.message);
+    expect((await repo.entries('personal')).single.discountMinor, 350);
+  });
   test(
     'confirmation can create and use a searched category atomically',
     () async {

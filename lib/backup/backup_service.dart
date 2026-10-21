@@ -169,6 +169,16 @@ class BackupService {
           row.putIfAbsent('tags_json', () => '[]');
         }
       }
+      if (payload['schema_version'] < 17) {
+        final data = payload['tables'];
+        if (data is! Map || data['transactions'] is! List) {
+          throw const LedgerException('备份缺少交易');
+        }
+        for (final row in data['transactions']) {
+          if (row is! Map) throw const LedgerException('备份交易格式错误');
+          row.putIfAbsent('discount_minor', () => null);
+        }
+      }
       if (payload['schema_version'] < 5) {
         final data = payload['tables'];
         if (data is! Map ||

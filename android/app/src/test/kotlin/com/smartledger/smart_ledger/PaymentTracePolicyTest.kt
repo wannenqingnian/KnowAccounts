@@ -31,13 +31,28 @@ class PaymentTracePolicyTest {
             "account" to "招商银行信用卡1234",
             "category" to "餐饮美食",
             "raw" to "付款给谁的完整原文",
+            "qualityScore" to "92",
+            "amountMatch" to "1",
+            "categoryMatch" to "0",
+            "remarkScore" to "80",
+            "discountMinor" to "300",
         ))
         assertFalse(fields.containsKey("amount"))
         assertEquals("三**********司", fields["merchant"])
         assertEquals("招******1234", fields["account"])
         assertEquals("餐**食", fields["category"])
         assertFalse(fields.containsKey("raw"))
+        assertEquals("92", fields["qualityScore"])
+        assertEquals("1", fields["amountMatch"])
+        assertEquals("0", fields["categoryMatch"])
+        assertEquals("80", fields["remarkScore"])
+        assertFalse(fields.containsKey("discountMinor"))
         assertTrue(PaymentTracePolicy.fields(mapOf("amount" to "转账3元")).isEmpty())
+        assertTrue(PaymentTracePolicy.fields(mapOf(
+            "qualityScore" to "101",
+            "amountMatch" to "yes",
+            "remarkScore" to "-1",
+        )).isEmpty())
         val revealed = PaymentTracePolicy.fields(mapOf(
             "amount" to "3.00",
             "merchant" to "三津实业（深圳）有限公司",

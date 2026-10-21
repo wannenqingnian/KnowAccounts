@@ -66,8 +66,13 @@ object PaymentTracePolicy {
         "worker_revoked",
         "worker_posted",
         "worker_pending",
+        "worker_duplicate_order",
+        "worker_duplicate_semantic",
+        "worker_duplicate_same_day",
+        "worker_duplicate_time",
         "worker_repeated",
         "worker_discarded",
+        "worker_quality",
         "worker_finish",
         "worker_start_failed",
         "worker_timeout",
@@ -107,6 +112,13 @@ object PaymentTracePolicy {
                 result[key] = if (raw.length == 1) "*" else raw.take(1) + "*".repeat((raw.length - tail.length - 1).coerceAtLeast(1)) + tail
             }
         }
+        (value["qualityScore"] as? String)?.takeIf { Regex("^\\d{1,3}$").matches(it) }
+            ?.let { if (it.toInt() <= 100) result["qualityScore"] = it }
+        for (key in listOf("amountMatch", "categoryMatch", "accountMatch")) {
+            (value[key] as? String)?.takeIf { it == "0" || it == "1" }?.let { result[key] = it }
+        }
+        (value["remarkScore"] as? String)?.takeIf { Regex("^\\d{1,3}$").matches(it) }
+            ?.let { if (it.toInt() <= 100) result["remarkScore"] = it }
         return result
     }
     fun retained(time: Long, now: Long) = time > 0 && time <= now && now - time <= maxAge

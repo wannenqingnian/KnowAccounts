@@ -230,6 +230,9 @@ class _ReviewInboxState extends ConsumerState<ReviewInbox> {
             TransactionInput(
               type: value.type,
               amountMinor: value.amountMinor!,
+              discountMinor: int.tryParse(
+                value.evidence['discount_minor'] ?? '',
+              ),
               accountId: value.accountId!,
               categoryId: value.categoryId,
               occurredDate: value.occurredDate,

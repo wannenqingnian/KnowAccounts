@@ -128,6 +128,7 @@ class _OcrPageState extends ConsumerState<OcrPage> {
         TransactionInput(
           type: draft.type,
           amountMinor: draft.amountMinor!,
+          discountMinor: int.tryParse(draft.evidence['discount_minor'] ?? ''),
           accountId: draft.accountId!,
           categoryId: draft.categoryId,
           merchant: draft.merchant,

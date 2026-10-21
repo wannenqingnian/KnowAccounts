@@ -64,6 +64,13 @@ void main() {
             outcomes.add(call.arguments['outcome']);
             if (call.arguments['outcome'] == 'repeated') {
               expect(call.arguments.containsKey('preview'), isFalse);
+              expect(call.arguments.containsKey('quality'), isFalse);
+            } else {
+              final quality = call.arguments['quality'];
+              expect(quality, isA<Map>());
+              expect(quality['qualityScore'], isA<String>());
+              expect(quality.toString(), isNot(contains('瑞幸咖啡')));
+              expect(quality.toString(), isNot(contains('38.50')));
             }
             remaining--;
             expect((await repo.entries('personal')).length, 1);

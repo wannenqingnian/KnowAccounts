@@ -110,7 +110,7 @@ object PaymentOverlay {
         val selectedType=listOf("", "expense", "income", "transfer", "refund").getOrElse(selectedTypePosition){""}
         val selectedCategory=categoryChoices.getOrNull(category?.selectedItemPosition ?: -1)
         return JSONObject().put("draftId",item.optString("draftId")).put("ledgerId",selected(ledger,ledgerChoices))
-            .put("amount",amount?.text?.toString() ?: "").put("merchant",merchant?.text?.toString() ?: "").put("note",note?.text?.toString() ?: "")
+            .put("amount",amount?.text?.toString() ?: "").put("discountMinor",item.optString("discountMinor")).put("merchant",merchant?.text?.toString() ?: "").put("note",note?.text?.toString() ?: "")
             .put("tags",tags?.text?.toString() ?: "")
             .put("date",date?.text?.toString() ?: "").put("type",selectedType).put("accountId",selected(account,accountChoices))
             .put("targetAccountId",selected(target,accountChoices)).put("categoryId",selectedCategory?.optString("id") ?: "")

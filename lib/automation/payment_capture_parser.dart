@@ -4,6 +4,7 @@ import '../domain/family_payment.dart';
 import '../domain/money.dart';
 import '../transaction/parser/transaction_parser.dart';
 import '../transaction/parser/ocr_receipt_parser.dart';
+import '../transaction/parser/payment_discount_parser.dart';
 import '../transaction/parser/chinese_number_parser.dart';
 import '../transaction/auto_correction.dart';
 import '../transaction/confidence/confidence_engine.dart';
@@ -226,6 +227,14 @@ class PaymentCaptureParser {
       if (values.length == 1) amount = values.single;
       if (values.length > 1) warnings.add('通知存在多个金额，请核对');
     }
+    final directDiscount = receipt?.evidence['discount_minor'] == null
+        ? PaymentDiscountParser.parse(original, paidMinor: amount)
+        : null;
+    if (directDiscount != null && directDiscount.minor > 0) {
+      warnings.add(
+        '页面显示优惠${_minorText('${directDiscount.minor}')}，实付${amount == null ? '未确定' : _minorText('$amount')}，请核对',
+      );
+    }
     var merchant = _cleanCapturedMerchant(receipt?.merchant ?? '');
     // A notification's title is an app/channel name, never a merchant.
     if (capture.kind == 'notification' || capture.kind == 'bankNotice') {
@@ -408,6 +417,8 @@ class PaymentCaptureParser {
           'family_platform': familyPayment.platform.name,
         if (familyPayment?.roleHint != null)
           'family_role': familyPayment!.roleHint!.name,
+        if (directDiscount != null) 'discount_minor': '${directDiscount.minor}',
+        if (directDiscount != null) 'discount_source': directDiscount.source,
       },
       familyRole: familyPayment?.roleHint,
     );

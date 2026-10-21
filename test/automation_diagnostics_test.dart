@@ -227,6 +227,10 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('诊断中心'), findsOneWidget);
+      expect(find.text('自动记账记录'), findsOneWidget);
+      expect(find.text('技术日志'), findsOneWidget);
+      await tester.tap(find.text('技术日志'));
+      await tester.pumpAndSettle();
       expect(find.text('日志记录已开启'), findsOneWidget);
       expect(find.text('未找到可识别的交易金额'), findsOneWidget);
       expect(find.text('已匹配交易信息'), findsOneWidget);
@@ -320,6 +324,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.tap(find.text('技术日志'));
+    await tester.pumpAndSettle();
     final moneyTile = find.ancestor(
       of: find.text('未找到可识别的交易金额'),
       matching: find.byType(ExpansionTile),
@@ -352,16 +358,25 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
-  testWidgets('紧凑日志页首屏直接显示多条问题记录', (tester) async {
-    tester.view.physicalSize = const Size(390, 780);
+  testWidgets('自动记账记录按采集聚合问题并显示原因', (tester) async {
+    tester.view.physicalSize = const Size(390, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     final bridge = LogBridge()
       ..events = [
-        event('money_missing', 'com.tencent.mm', 'accessibility', 3000),
-        event('ocr_no_match', 'com.tencent.mm', 'accessibility', 2000),
-        event('success_missing', 'com.tencent.mm', 'accessibility', 1000),
+        {
+          ...event('money_missing', 'com.tencent.mm', 'accessibility', 3000),
+          'ref': 'aaaaaaaaaaaa',
+        },
+        {
+          ...event('ocr_no_match', 'com.tencent.mm', 'accessibility', 2000),
+          'ref': 'bbbbbbbbbbbb',
+        },
+        {
+          ...event('success_missing', 'com.tencent.mm', 'accessibility', 1000),
+          'ref': 'cccccccccccc',
+        },
       ];
     final appLogger = AppLogger.memory();
     await tester.pumpWidget(
@@ -373,8 +388,12 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    expect(find.text('未找到可识别的交易金额').hitTestable(), findsOneWidget);
-    expect(find.text('截图未匹配明确的已完成账单').hitTestable(), findsOneWidget);
+    expect(find.text('未生成账单').hitTestable(), findsNWidgets(3));
+    expect(
+      find.textContaining('未找到唯一、明确的本笔交易金额').hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.textContaining('截图文本中未找到明确金额').hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
   });

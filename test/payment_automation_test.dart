@@ -8,6 +8,8 @@ import 'package:smart_ledger/automation/payment_apps.dart';
 import 'package:smart_ledger/automation/payment_capture_parser.dart';
 import 'package:smart_ledger/automation/payment_capture_processor.dart';
 import 'package:smart_ledger/transaction/parser/transaction_parser.dart';
+import 'package:smart_ledger/transaction/parser/payment_discount_parser.dart';
+import 'package:smart_ledger/transaction/transaction_identity.dart';
 
 void main() {
   driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
@@ -46,6 +48,79 @@ void main() {
   tearDown(() => db.close());
   const complete =
       '支付成功\n商户名称 瑞幸咖啡\n交易金额 38.50元\n支付方式 微信零钱\n支付时间 2026-10-05 12:05';
+  test(
+    'discount stays separate from the paid amount and obvious coupons do not match',
+    () {
+      final parsed = PaymentCaptureParser().parse(
+        event(
+          '支付成功\n商户名称 瑞幸咖啡\n交易金额 38.50元\n已优惠 3.50元\n支付方式 微信零钱\n支付时间 2026-10-05 12:05',
+        ),
+        accounts,
+        categories,
+        now: time,
+      );
+      expect(parsed.draft.amountMinor, 3850);
+      expect(parsed.draft.evidence['discount_minor'], '350');
+      expect(parsed.draft.evidence['discount_source'], isNotEmpty);
+      expect(
+        parsed.canAutoSave,
+        isTrue,
+        reason: parsed.draft.warnings.join(';'),
+      );
+      expect(
+        PaymentDiscountParser.parse(
+          '订单金额 ¥42.00\n实付金额 ¥38.50',
+          paidMinor: 3850,
+        )?.minor,
+        350,
+      );
+      expect(
+        PaymentDiscountParser.parse('支付成功\n8.5折\n优惠券', paidMinor: 8000),
+        isNull,
+      );
+      expect(
+        PaymentDiscountParser.parse('满100减20', paidMinor: 8000)?.minor,
+        2000,
+      );
+    },
+  );
+  test(
+    'missing merchant duplicate is held inside the five-minute window',
+    () async {
+      final account = accounts.firstWhere(
+        (item) => item.kind == AccountKind.alipay,
+      );
+      final category = categories.firstWhere(
+        (item) => item.type == TransactionType.expense,
+      );
+      await repo.save(
+        'personal',
+        TransactionInput(
+          type: TransactionType.expense,
+          amountMinor: 1600,
+          accountId: account.id,
+          categoryId: category.id,
+          occurredDate: time,
+          merchant: '瑞幸咖啡',
+        ),
+      );
+      final duplicate = await repo.assessStructuredDuplicate(
+        'personal',
+        TransactionInput(
+          type: TransactionType.expense,
+          amountMinor: 1600,
+          accountId: account.id,
+          categoryId: category.id,
+          occurredDate: time.add(const Duration(minutes: 1)),
+          merchant: '',
+        ),
+        const TransactionIdentitySeed(source: TransactionEvidenceSource.manual),
+      );
+      expect(duplicate.possible, isTrue);
+      expect(duplicate.matchBasis, 'amount_time');
+      expect(duplicate.message, contains('商户证据不足'));
+    },
+  );
   test(
     'reimbursement receipt never auto posts as ordinary income and text source directs linking',
     () async {

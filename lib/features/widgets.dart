@@ -130,7 +130,7 @@ class EntryTile extends StatelessWidget {
         style: textTheme.titleSmall,
       ),
       subtitle: Text(
-        '${entry.accountName} · ${entry.isReimbursement ? '报销到账' : typeLabel(entry.type)}${entry.currency == 'CNY' ? '' : ' · 折合${visibleMoney(context, entry.amountMinor)}'}${entry.reimbursable ? ' · ${entry.reimbursementStatus}' : ''}${entry.attachmentCount > 0 ? ' · 图片${entry.attachmentCount}' : ''}${entry.note.isNotEmpty ? ' · ${entry.note}' : ''}',
+        '${entry.accountName} · ${entry.isReimbursement ? '报销到账' : typeLabel(entry.type)}${entry.currency == 'CNY' ? '' : ' · 折合${visibleMoney(context, entry.amountMinor)}'}${entry.reimbursable ? ' · ${entry.reimbursementStatus}' : ''}${entry.attachmentCount > 0 ? ' · 图片${entry.attachmentCount}' : ''}${entry.discountMinor != null && entry.discountMinor! > 0 ? ' · 优惠${visibleMoney(context, entry.discountMinor!)}' : ''}${entry.note.isNotEmpty ? ' · ${entry.note}' : ''}',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: textTheme.bodySmall,

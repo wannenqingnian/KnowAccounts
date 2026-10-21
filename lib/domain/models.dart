@@ -303,6 +303,7 @@ class LedgerEntry {
     this.tags = const [],
     this.currency = 'CNY',
     this.originalAmountMinor,
+    this.discountMinor,
     this.exchangeRateMicros = 1000000,
     this.targetCurrency,
     this.targetAmountMinor,
@@ -341,6 +342,10 @@ class LedgerEntry {
   final List<String> tags;
   final String currency;
   final int? originalAmountMinor;
+
+  /// Coupon/立减 amount shown on the receipt. The paid [amountMinor] remains
+  /// the amount used for balances, budgets and reports.
+  final int? discountMinor;
   final int exchangeRateMicros;
   final String? targetCurrency;
   final int? targetAmountMinor;
@@ -363,6 +368,7 @@ class TransactionInput {
     this.relatedTransactionId,
     this.reimbursable = false,
     this.isReimbursement = false,
+    this.discountMinor,
     this.tags = const [],
   });
   final TransactionType type;
@@ -376,6 +382,7 @@ class TransactionInput {
   final String? relatedTransactionId;
   final bool reimbursable;
   final bool isReimbursement;
+  final int? discountMinor;
   final List<String> tags;
 }
 

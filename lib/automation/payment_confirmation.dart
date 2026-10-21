@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:drift/drift.dart' show Variable;
 import '../data/family_payment_repository.dart';
 import '../data/ledger_repository.dart';
@@ -123,6 +124,7 @@ Future<Map<String, Object?>?> paymentPreview(
     'amount': parsed.amountMinor == null
         ? ''
         : '${parsed.amountMinor! ~/ 100}.${(parsed.amountMinor! % 100).toString().padLeft(2, '0')}',
+    'discountMinor': parsed.evidence['discount_minor'] ?? '',
     'merchant': parsed.merchant,
     'note': parsed.note,
     'date': dateTimeLabel(parsed.occurredDate),
@@ -186,7 +188,7 @@ Future<ConfirmationResult> confirmPayment(
     return await repo.db.transaction(() async {
       final rows = await repo.db
           .customSelect(
-            'SELECT d.status,r.ledger_id FROM transaction_drafts d JOIN raw_transactions r ON r.id=d.raw_id WHERE d.id=?',
+            'SELECT d.status,d.parsed_json,r.ledger_id FROM transaction_drafts d JOIN raw_transactions r ON r.id=d.raw_id WHERE d.id=?',
             variables: [Variable<String>(id)],
           )
           .get();
@@ -248,6 +250,24 @@ Future<ConfirmationResult> confirmPayment(
         throw const LedgerException('请输入有效日期时间YYYY-MM-DD HH:MM:SS');
       }
       final amount = parseMoney(data['amount'] is String ? data['amount'] : '');
+      var storedDiscount = '';
+      try {
+        final decoded = jsonDecode(rows.single.read<String>('parsed_json'));
+        final evidence = decoded is Map ? decoded['evidence'] : null;
+        if (evidence is Map && evidence['discount_minor'] != null) {
+          storedDiscount = '${evidence['discount_minor']}';
+        }
+      } catch (_) {
+        // A corrupt legacy draft should still be confirmable; discount is extra.
+      }
+      final submittedDiscount = data['discountMinor'] is String
+          ? (data['discountMinor'] as String).trim()
+          : '';
+      final discountMinor = type == TransactionType.expense
+          ? int.tryParse(
+              submittedDiscount.isNotEmpty ? submittedDiscount : storedDiscount,
+            )
+          : null;
       final account = data['accountId'] is String
           ? data['accountId'] as String
           : '';
@@ -266,6 +286,7 @@ Future<ConfirmationResult> confirmPayment(
           TransactionInput(
             type: type!,
             amountMinor: amount,
+            discountMinor: discountMinor,
             occurredDate: date,
             merchant: merchant,
             accountId: account,
@@ -297,6 +318,7 @@ Future<ConfirmationResult> confirmPayment(
         TransactionInput(
           type: type!,
           amountMinor: amount,
+          discountMinor: discountMinor,
           accountId: account,
           occurredDate: date,
           categoryId: categoryId.isEmpty ? null : categoryId,

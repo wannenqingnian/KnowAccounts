@@ -1,4 +1,5 @@
 import 'chinese_number_parser.dart';
+import 'payment_discount_parser.dart';
 import '../../domain/models.dart';
 
 class OcrReceipt {
@@ -474,6 +475,22 @@ class OcrReceiptParser {
       }
     }
     if (merchant.isEmpty) {
+      final inline = RegExp(
+        r'(?:商户全称|商户名称|收款商户|商家名称|商户|商家|收款方|收款单位|收款人|对方账户|付款给|支付给)[ \t]*[:：]?[ \t]*([^\n，,；;]{2,60})',
+      ).firstMatch(body);
+      final sentence = RegExp(
+        r'(?:向|在)[ \t]*([^\n，,；;]{2,50}?)[ \t]*(?:成功)?(?:付款|支付|消费)',
+      ).firstMatch(body);
+      for (final candidate in [inline?[1], sentence?[1]]) {
+        final value = _cleanMerchantFallback(candidate ?? '');
+        if (_merchantValue(value)) {
+          merchant = value;
+          evidence['merchant'] = '页面文字：$merchant';
+          break;
+        }
+      }
+    }
+    if (merchant.isEmpty) {
       final moneyIndex = lines.indexWhere(_headline.hasMatch);
       if (moneyIndex >= 0) {
         final following = lines
@@ -491,6 +508,13 @@ class OcrReceiptParser {
         evidence['merchant'] = '账单标题：$merchant';
         warnings.add('商户取自账单标题，请核对');
       }
+    }
+    final discount = !refund && amount != null
+        ? PaymentDiscountParser.parse(body, paidMinor: amount)
+        : null;
+    if (discount != null && discount.minor > 0) {
+      evidence['discount_minor'] = '${discount.minor}';
+      evidence['discount_source'] = discount.source;
     }
     var account = '';
     final accounts = fields
@@ -665,6 +689,22 @@ class OcrReceiptParser {
       !_navigation.hasMatch(
         s.replaceAll(RegExp(r'^[^\u3400-\u9fffA-Za-z]+'), ''),
       );
+
+  String _cleanMerchantFallback(String value) {
+    var clean = value.trim().replaceAll(RegExp(r'[ \t]+'), ' ');
+    clean = clean.replaceFirst(
+      RegExp(
+        r'[ \t]*(?:[,，;；|][ \t]*)?(?:支出|收入|实付|实收|交易金额|消费金额|金额)[ \t]*[:：]?.*$',
+      ),
+      '',
+    );
+    clean = clean.replaceFirst(
+      RegExp(r'[ \t]+[¥￥]?[+\-−－–—]?[ \t]*\d+(?:\.\d{1,2})?[ \t]*元?$'),
+      '',
+    );
+    return clean.trim();
+  }
+
   String _title(List<String> lines) {
     final candidates = lines
         .where(

@@ -190,7 +190,9 @@ class _HomeShellState extends ConsumerState<HomeShell>
                               ? entry.categoryName ?? typeLabel(entry.type)
                               : entry.merchant,
                         ),
-                        subtitle: Text(entry.accountName),
+                        subtitle: Text(
+                          '${entry.accountName}${entry.discountMinor != null && entry.discountMinor! > 0 ? ' · 优惠${visibleMoney(context, entry.discountMinor!)}' : ''}',
+                        ),
                         trailing: Text(
                           '${entry.type == TransactionType.refund ? '+' : '-'}${visibleMoney(context, entry.amountMinor)}',
                         ),
