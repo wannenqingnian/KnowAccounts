@@ -53,6 +53,7 @@ jobs:
       - name: Verify diagnostics and location regressions
         run: |
           flutter test --no-pub --concurrency=1 test/automation_diagnostics_test.dart
+          flutter test --no-pub --concurrency=1 test/detailed_diagnostics_test.dart
           flutter test --no-pub test/transaction_location_test.dart
           flutter test --no-pub test/ocr_manual_test.dart
 
@@ -89,7 +90,7 @@ jobs:
 
       - name: Verify Android diagnostic privacy policy
         working-directory: android
-        run: bash ./gradlew -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.accessibilityReceiptProducesUsefulMaskedDiagnosticFields --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.recognizedFieldsAreAllowlistedAndMasked
+        run: bash ./gradlew -Pkotlin.incremental=false :app:testDebugUnitTest --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.accessibilityReceiptProducesUsefulMaskedDiagnosticFields --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.recognizedFieldsAreAllowlistedAndMasked --tests com.smartledger.smart_ledger.PaymentTracePolicyTest.detailedPaymentFieldsRequireConsentAndAreScrubbedWhenDisabled
 
       - name: Verify release JNI libraries
         run: python3 tool/verify_ocr_jni_apk.py build/app/outputs/flutter-apk/app-release.apk
