@@ -60,6 +60,7 @@ object PaymentTracePolicy {
         "worker_start",
         "worker_ready",
         "worker_take",
+        "worker_details",
         "confidence_high",
         "confidence_review",
         "confidence_low",
@@ -111,6 +112,11 @@ object PaymentTracePolicy {
                 val tail = if (key == "account") Regex("\\d{4}(?=\\D*$)").find(raw)?.value ?: raw.takeLast(1) else raw.takeLast(1)
                 result[key] = if (raw.length == 1) "*" else raw.take(1) + "*".repeat((raw.length - tail.length - 1).coerceAtLeast(1)) + tail
             }
+        }
+        if (reveal) for (key in listOf("paymentText", "paymentMethod", "paymentTime", "paymentStatus", "orderId", "merchantOrderId", "parsedFields", "warnings")) {
+            val raw = (value[key] as? String)?.trim()?.takeIf { it.isNotEmpty() } ?: continue
+            val limit = if (key == "parsedFields") 12000 else if (key == "paymentText") 4000 else 1000
+            result[key] = if (raw.length <= limit) raw else raw.take(limit) + "\n[内容过长，已截断]"
         }
         (value["qualityScore"] as? String)?.takeIf { Regex("^\\d{1,3}$").matches(it) }
             ?.let { if (it.toInt() <= 100) result["qualityScore"] = it }

@@ -108,7 +108,7 @@ object PaymentAutomation {
                     "setDiagnosticsSensitive" -> { check(foreground); PaymentTrace.setSensitive(context,call.argument<Boolean>("enabled")==true); result.success(null) }
                     "workerTrace" -> {
                         check(!foreground)
-                        PaymentTrace.event(context,call.argument<String>("code") ?: "",call.argument<String>("app") ?: "",call.argument<String>("source") ?: "",call.argument<String>("id") ?: "",call.argument<Int>("count") ?: 0)
+                        PaymentTrace.event(context,call.argument<String>("code") ?: "",call.argument<String>("app") ?: "",call.argument<String>("source") ?: "",call.argument<String>("id") ?: "",call.argument<Int>("count") ?: 0,call.argument<Map<*, *>>("fields"))
                         result.success(null)
                     }
                     "configure" -> {

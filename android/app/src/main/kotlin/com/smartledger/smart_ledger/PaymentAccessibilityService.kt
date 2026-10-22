@@ -185,7 +185,8 @@ class PaymentAccessibilityService : AccessibilityService() {
             PaymentAutomation.accessibilityUsableTextCount = lines.size
             PaymentAutomation.accessibilityPageSessionId = occurrence
             PaymentAutomation.accessibilityWindowPackage = pkg
-            PaymentTrace.event(this,"node_read",pkg,"accessibility",count=visited)
+            PaymentTrace.event(this,"node_read",pkg,"accessibility",count=visited,
+                fields=if (PaymentPageRouter.isChatClass(pkg, windowClass)) null else PaymentCaptureGuard.diagnosticFields(lines.joinToString("\n")))
             val assessment = pageSession.assess(lines, System.currentTimeMillis())
             if (assessment.matched) {
                 PaymentTrace.event(this,"page_session_matched",pkg,"accessibility",count=assessment.attempt,fields=PaymentCaptureGuard.diagnosticFields(assessment.text))

@@ -2,6 +2,7 @@ import 'payment_apps.dart';
 import 'payment_quality.dart';
 
 const diagnosticLabels = <String, String>{
+  'worker_details': '完整字段解析与账本匹配结果',
   'notification_connected': '通知监听服务已连接',
   'notification_disconnected': '通知监听服务已断开',
   'accessibility_connected': '无障碍服务已连接',
@@ -147,6 +148,25 @@ class DiagnosticEvent {
   final int time, count, repeats;
   final String code, app, source, reference;
   final Map<String, String> fields;
+  static const detailLabels = {
+    'amount': '金额',
+    'merchant': '商户',
+    'account': '匹配账本账户',
+    'category': '匹配账本分类',
+    'paymentMethod': '页面付款方式',
+    'paymentTime': '页面交易时间',
+    'paymentStatus': '页面交易状态',
+    'orderId': '交易单号',
+    'merchantOrderId': '商户单号',
+    'warnings': '具体核对原因',
+    'parsedFields': '完整解析结果（含证据、置信度与匹配 ID）',
+    'paymentText': '支付页面读取内容',
+  };
+  String get detailText => [
+    for (final entry in detailLabels.entries)
+      if (fields[entry.key]?.isNotEmpty == true)
+        '${entry.value}：\n${fields[entry.key]}',
+  ].join('\n\n');
   String get label => diagnosticLabels[code]!;
   PaymentQuality? get quality =>
       code == 'worker_quality' ? PaymentQuality.tryParse(fields) : null;
@@ -207,6 +227,7 @@ class DiagnosticEvent {
         '${count == 0 ? "" : " | 数量 $count"}'
         '${repeats <= 1 ? "" : " | 合并重复 $repeats 次"}'
         '${recognized.isEmpty ? "" : " | 识别：$recognized"}'
+        '${detailText.isEmpty ? "" : "\n$detailText"}'
         '${quality == null ? "" : " | 质量 ${quality!.score} 分 ${quality!.summary}"}'
         ' | 事件码 $code\n';
   }
@@ -757,6 +778,17 @@ class PaymentLogRecord {
     if (category.isNotEmpty) category,
   ].join(' · ');
 
+  String get detailText => DiagnosticEvent(
+    0,
+    '',
+    '',
+    '',
+    '',
+    0,
+    1,
+    fields: {for (final event in events) ...event.fields},
+  ).detailText;
+
   String get reason {
     if (outcome == PaymentLogOutcome.posted) {
       return '已按实付金额入账，余额和报表已更新。';
@@ -768,10 +800,15 @@ class PaymentLogRecord {
       return decisive.explanation.what;
     }
     if (outcome == PaymentLogOutcome.pending) {
+      final warnings = events
+          .map((e) => e.fields['warnings'] ?? '')
+          .where((w) => w.isNotEmpty)
+          .toSet();
+      if (warnings.isNotEmpty) return warnings.join('；');
       if (quality?.needsReview == true) {
         return '识别质量 ${quality!.score} 分：${quality!.summary}';
       }
-      DiagnosticEvent? warning;
+      final warningsByCode = <String, String>{};
       for (final event in events) {
         if (const {
           'amount_missing',
@@ -782,10 +819,13 @@ class PaymentLogRecord {
           'overlay_denied',
           'overlay_failed',
         }.contains(event.code)) {
-          warning = event;
+          warningsByCode[event.code] = event.explanation.what;
         }
       }
-      return warning?.explanation.what ?? '字段不完整或置信度不足，暂未自动入账。';
+      if (warningsByCode.length > 1) warningsByCode.remove('warning_review');
+      return warningsByCode.isEmpty
+          ? '字段不完整或置信度不足，暂未自动入账。'
+          : warningsByCode.values.join('；');
     }
     if (outcome == PaymentLogOutcome.skipped) {
       return decisive.explanation.what;
@@ -823,6 +863,7 @@ class PaymentLogRecord {
   String get exportText => [
     '$readableTime · $title',
     if (subtitle.isNotEmpty) '识别：$subtitle',
+    if (detailText.isNotEmpty) detailText,
     '原因：$reason',
     '下一步：$action',
     if (quality != null) '识别质量：${quality!.score} 分 · ${quality!.summary}',
@@ -832,8 +873,14 @@ class PaymentLogRecord {
   static List<PaymentLogRecord> fromEvents(List<DiagnosticEvent> source) {
     final groups = <String, List<DiagnosticEvent>>{};
     for (final event in source) {
-      if (event.reference.isEmpty) continue;
-      groups.putIfAbsent(event.reference, () => []).add(event);
+      if (event.reference.isEmpty &&
+          _codeOutcome(event.code) != PaymentLogOutcome.skipped) {
+        continue;
+      }
+      final key = event.reference.isEmpty
+          ? 'unlinked-${event.time}-${event.app}-${event.source}-${event.code}'
+          : event.reference;
+      groups.putIfAbsent(key, () => []).add(event);
     }
     final records = <PaymentLogRecord>[];
     for (final entry in groups.entries) {
@@ -858,7 +905,7 @@ class PaymentLogRecord {
       }
       records.add(
         PaymentLogRecord(
-          reference: entry.key,
+          reference: decisive.reference,
           time: decisive.time,
           outcome: outcome,
           events: events,
@@ -1180,6 +1227,45 @@ Map<String, String> _diagnosticFields(dynamic value, {bool reveal = false}) {
     result[key] = chars.length == 1
         ? '*'
         : '${chars.first}${List.filled((chars.length - tail.length - 1).clamp(1, 100), '*').join()}$tail';
+  }
+  if (reveal) {
+    for (final key in const [
+      'paymentText',
+      'paymentMethod',
+      'paymentTime',
+      'paymentStatus',
+      'orderId',
+      'merchantOrderId',
+      'parsedFields',
+      'warnings',
+    ]) {
+      final raw = value[key];
+      if (raw is! String || raw.trim().isEmpty) continue;
+      final limit = key == 'parsedFields'
+          ? 12000
+          : key == 'paymentText'
+          ? 4000
+          : 1000;
+      result[key] = raw.length <= limit + 16
+          ? raw
+          : '${raw.substring(0, limit)}\n[内容过长，已截断]';
+    }
+  }
+  // Quality scores are non-sensitive; retain them in either privacy mode.
+  for (final key in const [
+    'qualityScore',
+    'remarkScore',
+    'amountMatch',
+    'categoryMatch',
+    'accountMatch',
+  ]) {
+    final raw = value[key];
+    final number = raw is String ? int.tryParse(raw) : null;
+    if (number != null &&
+        number >= 0 &&
+        number <= (key.endsWith('Match') ? 1 : 100)) {
+      result[key] = raw as String;
+    }
   }
   return result;
 }

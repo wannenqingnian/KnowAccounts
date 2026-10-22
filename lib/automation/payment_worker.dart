@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:drift/drift.dart' show Variable;
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:sqlite3/sqlite3.dart' show SqliteException;
@@ -10,7 +12,12 @@ import 'payment_confirmation.dart';
 import '../transaction/confidence/confidence_models.dart';
 import '../transaction/confidence/confidence_profile_bundle.dart';
 
-Future<void> _trace(String code, [PaymentCapture? capture, int? count]) async {
+Future<void> _trace(
+  String code, [
+  PaymentCapture? capture,
+  int? count,
+  Map<String, String>? fields,
+]) async {
   try {
     await AutomationBridge.channel.invokeMethod('workerTrace', {
       'code': code,
@@ -20,6 +27,7 @@ Future<void> _trace(String code, [PaymentCapture? capture, int? count]) async {
         'id': capture.id,
       },
       'count': ?count,
+      'fields': ?fields,
     });
   } catch (_) {
     /* Diagnostics must not interrupt bookkeeping. */
@@ -74,6 +82,34 @@ Future<void> runPaymentAutomationWorker({
       await _trace('worker_take', capture);
       final result = await processor.processWithQuality(capture);
       final outcome = result.outcome;
+      try {
+        final rows = await repository.db
+            .customSelect(
+              'SELECT parsed_json FROM transaction_drafts WHERE id = ?',
+              variables: [Variable<String>('auto-${capture.id}')],
+            )
+            .get();
+        if (rows.isNotEmpty) {
+          final parsed =
+              jsonDecode(rows.single.read<String>('parsed_json')) as Map;
+          final accounts = await repository.accounts(capture.ledgerId);
+          final categories = await repository.categories(capture.ledgerId);
+          final account = accounts
+              .where((a) => a.id == parsed['account_id'])
+              .firstOrNull;
+          final category = categories
+              .where((c) => c.id == parsed['category_id'])
+              .firstOrNull;
+          await _trace('worker_details', capture, null, {
+            'parsedFields': const JsonEncoder.withIndent('  ').convert(parsed),
+            'account': account?.displayName ?? '未匹配到账本账户',
+            'category': category?.name ?? '未匹配到账本分类',
+            'warnings': (parsed['warnings'] as List? ?? []).join('；'),
+          });
+        }
+      } catch (_) {
+        // A diagnostic read failure must never change the posting result.
+      }
       if (result.duplicateBasis.isNotEmpty) {
         await _trace(switch (result.duplicateBasis) {
           'order' => 'worker_duplicate_order',

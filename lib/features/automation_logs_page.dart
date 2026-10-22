@@ -501,6 +501,16 @@ class _PaymentRecordCard extends StatelessWidget {
         childrenPadding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
         children: [
           const Divider(height: 14),
+          if (record.detailText.isNotEmpty) ...[
+            Align(
+              alignment: Alignment.centerLeft,
+              child: SelectableText(
+                record.detailText,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
           _DiagnosticDetail(
             icon: Icons.fact_check_outlined,
             title: '结果',
@@ -535,10 +545,10 @@ class _PaymentRecordCard extends StatelessWidget {
               for (final event in record.events)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 5),
-                  child: Text(
+                  child: SelectableText(
                     '${DateTime.fromMillisecondsSinceEpoch(event.time).toLocal().toIso8601String().replaceFirst("T", " ")}'
-                    ' · ${event.label}'
-                    '${event.recognizedText.isEmpty ? "" : " · ${event.recognizedText}"}',
+                    ' · ${event.label} · ${event.code}\n${event.explanation.what}'
+                    '${event.detailText.isEmpty ? "" : "\n${event.detailText}"}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
@@ -795,566 +805,587 @@ class _AutomationLogsPageState extends ConsumerState<AutomationLogsPage>
       ),
       body: report == null
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Card(
-                  margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                  child: Column(
-                    children: [
-                      SwitchListTile.adaptive(
-                        dense: true,
-                        visualDensity: VisualDensity.compact,
-                        secondary: Icon(
-                          report.enabled
-                              ? Icons.receipt_long_outlined
-                              : Icons.receipt_long,
-                        ),
-                        title: Text(report.enabled ? '日志记录已开启' : '日志记录已关闭'),
-                        subtitle: const Text(
-                          '自动记账保留48小时/400条 · 应用日志保留14天/1000条',
-                        ),
-                        value: report.enabled,
-                        onChanged: (value) => _action(
-                          () => ref
-                              .read(automationBridgeProvider)
-                              .setDiagnosticsEnabled(value),
-                        ),
-                      ),
-                      const Divider(height: 1),
-                      SwitchListTile.adaptive(
-                        key: const ValueKey('sensitiveLogging'),
-                        dense: true,
-                        visualDensity: VisualDensity.compact,
-                        secondary: const Icon(Icons.privacy_tip_outlined),
-                        title: const Text('允许日志记录敏感信息'),
-                        subtitle: const Text('开启后日志会保存金额、商户和付款账户；关闭会立即脱敏已有日志'),
-                        value: report.state['sensitiveLogging'] == true,
-                        onChanged:
-                            report.enabled ||
-                                report.state['sensitiveLogging'] == true
-                            ? (value) => _action(
-                                () => ref
-                                    .read(automationBridgeProvider)
-                                    .setDiagnosticsSensitive(value),
-                              )
-                            : null,
-                      ),
-                    ],
-                  ),
-                ),
-                ExpansionTile(
-                  title: Text(
-                    '当前状态 · ${report.version} · Android API ${report.api}',
-                  ),
+          : CustomScrollView(
+              slivers: [
+                SliverList.list(
                   children: [
-                    SizedBox(
-                      height: 200,
-                      child: ListView(
+                    Card(
+                      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                      child: Column(
                         children: [
-                          for (final entry in diagnosticStateLabels.entries)
-                            ListTile(
-                              dense: true,
-                              title: Text(entry.value),
-                              trailing: Text(
-                                report.state[entry.key] == true ? '是' : '否',
-                              ),
+                          SwitchListTile.adaptive(
+                            dense: true,
+                            visualDensity: VisualDensity.compact,
+                            secondary: Icon(
+                              report.enabled
+                                  ? Icons.receipt_long_outlined
+                                  : Icons.receipt_long,
                             ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('待处理采集'),
-                            trailing: Text('${report.queued}'),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('无障碍扫描节点'),
-                            trailing: Text(
-                              '${report.accessibility.rootNodeCount} 个',
+                            title: Text(report.enabled ? '日志记录已开启' : '日志记录已关闭'),
+                            subtitle: const Text(
+                              '自动记账保留48小时/400条 · 应用日志保留14天/1000条',
                             ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('无障碍可用文本'),
-                            trailing: Text(
-                              '${report.accessibility.usableTextCount} 段',
+                            value: report.enabled,
+                            onChanged: (value) => _action(
+                              () => ref
+                                  .read(automationBridgeProvider)
+                                  .setDiagnosticsEnabled(value),
                             ),
                           ),
-                          ListTile(
+                          const Divider(height: 1),
+                          SwitchListTile.adaptive(
+                            key: const ValueKey('sensitiveLogging'),
                             dense: true,
-                            title: const Text('无障碍窗口应用'),
-                            trailing: Text(
-                              report.accessibility.windowPackage.isEmpty
-                                  ? '无'
-                                  : report.accessibility.windowPackage,
+                            visualDensity: VisualDensity.compact,
+                            secondary: const Icon(Icons.privacy_tip_outlined),
+                            title: const Text('允许日志记录敏感信息'),
+                            subtitle: const Text(
+                              '开启后保存支付页面文字、金额、商户、订单号和完整解析结果；关闭会清除这些详情。分享前请检查隐私',
                             ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('无障碍页面会话'),
-                            trailing: Text(
-                              report.accessibility.pageSessionId.isEmpty
-                                  ? '无'
-                                  : report.accessibility.pageSessionId,
-                            ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('OCR 截图状态'),
-                            trailing: Text(
-                              report.ocr.screenshotSucceeded ? '成功' : '未触发/未成功',
-                            ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('OCR 识别行数'),
-                            trailing: Text(
-                              '${report.ocr.recognizedLineCount} 行',
-                            ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('OCR 金额候选'),
-                            trailing: Text(
-                              report.ocr.amountCandidateFound ? '已找到' : '未找到',
-                            ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('OCR 完成状态'),
-                            trailing: Text(
-                              report.ocr.successMarkerFound ? '已找到' : '未找到',
-                            ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('OCR 拒绝原因'),
-                            trailing: Text(
-                              report.ocr.rejectionReason.isEmpty
-                                  ? '无'
-                                  : (diagnosticLabels[report
-                                            .ocr
-                                            .rejectionReason] ??
-                                        report.ocr.rejectionReason),
-                            ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('通知监听状态'),
-                            trailing: Text(
-                              report.notification.listenerConnected
-                                  ? '已连接'
-                                  : '未连接',
-                            ),
-                          ),
-                          ListTile(
-                            dense: true,
-                            title: const Text('通知最近连接'),
-                            trailing: Text(
-                              report.notification.lastConnectedAt > 0
-                                  ? DateTime.fromMillisecondsSinceEpoch(
-                                      report.notification.lastConnectedAt,
-                                    ).toLocal().toIso8601String().replaceFirst(
-                                      'T',
-                                      ' ',
-                                    )
-                                  : '无记录',
-                            ),
+                            value: report.state['sensitiveLogging'] == true,
+                            onChanged:
+                                report.enabled ||
+                                    report.state['sensitiveLogging'] == true
+                                ? (value) => _action(
+                                    () => ref
+                                        .read(automationBridgeProvider)
+                                        .setDiagnosticsSensitive(value),
+                                  )
+                                : null,
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
-                _DiagnosticSummary(
-                  events: report.events,
-                  appEvents: _appEvents,
-                ),
-                _QualitySummary(
-                  events: report.events,
-                  onlyLow: _qualityOnly,
-                  onToggle: () => setState(() => _qualityOnly = !_qualityOnly),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<String>(
-                      key: const ValueKey('logViewToggle'),
-                      showSelectedIcon: false,
-                      segments: const [
-                        ButtonSegment(
-                          value: 'records',
-                          icon: Icon(Icons.receipt_long_outlined, size: 17),
-                          label: Text('自动记账记录'),
-                        ),
-                        ButtonSegment(
-                          value: 'technical',
-                          icon: Icon(Icons.code, size: 17),
-                          label: Text('技术日志'),
-                        ),
-                      ],
-                      selected: {_view},
-                      onSelectionChanged: (value) =>
-                          setState(() => _view = value.first),
-                    ),
-                  ),
-                ),
-                if (appEvents.isNotEmpty)
-                  ExpansionTile(
-                    initiallyExpanded: _source == 'app',
-                    leading: const Icon(Icons.apps_outlined),
-                    title: Text('应用日志 · ${appEvents.length} 条'),
-                    subtitle: const Text('启动、数据库、界面与手动记账'),
-                    children: [
-                      for (final event in appEvents)
-                        Card(
-                          margin: const EdgeInsets.fromLTRB(12, 5, 12, 5),
-                          child: ExpansionTile(
-                            leading: Icon(
-                              _diagnosticIcon(_appLevel(event.level)),
-                              color: _diagnosticColor(
-                                context,
-                                _appLevel(event.level),
-                              ),
-                            ),
-                            title: Text(
-                              event.message,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            subtitle: Text(
-                              '${event.time.toIso8601String().replaceFirst("T", " ")} · ${_appArea(event.area)}',
-                            ),
-                            childrenPadding: const EdgeInsets.fromLTRB(
-                              16,
-                              2,
-                              16,
-                              10,
-                            ),
+                    ExpansionTile(
+                      title: Text(
+                        '当前状态 · ${report.version} · Android API ${report.api}',
+                      ),
+                      children: [
+                        SizedBox(
+                          height: 200,
+                          child: ListView(
                             children: [
-                              _DiagnosticDetail(
-                                icon: Icons.code,
-                                title: '技术信息',
-                                text: [
-                                  '事件码 ${event.code}',
-                                  if (event.correlationId.isNotEmpty)
-                                    '关联编号 ${event.correlationId}',
-                                  if (event.technical.isNotEmpty)
-                                    event.technical,
-                                ].join(' · '),
+                              for (final entry in diagnosticStateLabels.entries)
+                                ListTile(
+                                  dense: true,
+                                  title: Text(entry.value),
+                                  trailing: Text(
+                                    report.state[entry.key] == true ? '是' : '否',
+                                  ),
+                                ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('待处理采集'),
+                                trailing: Text('${report.queued}'),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('无障碍扫描节点'),
+                                trailing: Text(
+                                  '${report.accessibility.rootNodeCount} 个',
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('无障碍可用文本'),
+                                trailing: Text(
+                                  '${report.accessibility.usableTextCount} 段',
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('无障碍窗口应用'),
+                                trailing: Text(
+                                  report.accessibility.windowPackage.isEmpty
+                                      ? '无'
+                                      : report.accessibility.windowPackage,
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('无障碍页面会话'),
+                                trailing: Text(
+                                  report.accessibility.pageSessionId.isEmpty
+                                      ? '无'
+                                      : report.accessibility.pageSessionId,
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('OCR 截图状态'),
+                                trailing: Text(
+                                  report.ocr.screenshotSucceeded
+                                      ? '成功'
+                                      : '未触发/未成功',
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('OCR 识别行数'),
+                                trailing: Text(
+                                  '${report.ocr.recognizedLineCount} 行',
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('OCR 金额候选'),
+                                trailing: Text(
+                                  report.ocr.amountCandidateFound
+                                      ? '已找到'
+                                      : '未找到',
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('OCR 完成状态'),
+                                trailing: Text(
+                                  report.ocr.successMarkerFound ? '已找到' : '未找到',
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('OCR 拒绝原因'),
+                                trailing: Text(
+                                  report.ocr.rejectionReason.isEmpty
+                                      ? '无'
+                                      : (diagnosticLabels[report
+                                                .ocr
+                                                .rejectionReason] ??
+                                            report.ocr.rejectionReason),
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('通知监听状态'),
+                                trailing: Text(
+                                  report.notification.listenerConnected
+                                      ? '已连接'
+                                      : '未连接',
+                                ),
+                              ),
+                              ListTile(
+                                dense: true,
+                                title: const Text('通知最近连接'),
+                                trailing: Text(
+                                  report.notification.lastConnectedAt > 0
+                                      ? DateTime.fromMillisecondsSinceEpoch(
+                                              report
+                                                  .notification
+                                                  .lastConnectedAt,
+                                            )
+                                            .toLocal()
+                                            .toIso8601String()
+                                            .replaceFirst('T', ' ')
+                                      : '无记录',
+                                ),
                               ),
                             ],
                           ),
                         ),
-                    ],
-                  ),
-                if (_view == 'records') ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
-                    child: Row(
-                      children: [
-                        FilterChip(
-                          key: const ValueKey('attentionOnly'),
-                          selected: _attentionOnly,
-                          onSelected: (value) =>
-                              setState(() => _attentionOnly = value),
-                          label: Text(
-                            _attentionOnly
-                                ? '只看需处理 · ${visibleRecords.length}'
-                                : '只看需处理',
-                          ),
-                          avatar: const Icon(Icons.priority_high, size: 17),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            '每张卡片代表一笔采集，技术细节可展开',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
                       ],
                     ),
-                  ),
-                  Expanded(
-                    child: visibleRecords.isEmpty
-                        ? Center(
+                    _DiagnosticSummary(
+                      events: report.events,
+                      appEvents: _appEvents,
+                    ),
+                    _QualitySummary(
+                      events: report.events,
+                      onlyLow: _qualityOnly,
+                      onToggle: () =>
+                          setState(() => _qualityOnly = !_qualityOnly),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<String>(
+                          key: const ValueKey('logViewToggle'),
+                          showSelectedIcon: false,
+                          segments: const [
+                            ButtonSegment(
+                              value: 'records',
+                              icon: Icon(Icons.receipt_long_outlined, size: 17),
+                              label: Text('自动记账记录'),
+                            ),
+                            ButtonSegment(
+                              value: 'technical',
+                              icon: Icon(Icons.code, size: 17),
+                              label: Text('技术日志'),
+                            ),
+                          ],
+                          selected: {_view},
+                          onSelectionChanged: (value) =>
+                              setState(() => _view = value.first),
+                        ),
+                      ),
+                    ),
+                    if (appEvents.isNotEmpty)
+                      ExpansionTile(
+                        initiallyExpanded: _source == 'app',
+                        leading: const Icon(Icons.apps_outlined),
+                        title: Text('应用日志 · ${appEvents.length} 条'),
+                        subtitle: const Text('启动、数据库、界面与手动记账'),
+                        children: [
+                          for (final event in appEvents)
+                            Card(
+                              margin: const EdgeInsets.fromLTRB(12, 5, 12, 5),
+                              child: ExpansionTile(
+                                leading: Icon(
+                                  _diagnosticIcon(_appLevel(event.level)),
+                                  color: _diagnosticColor(
+                                    context,
+                                    _appLevel(event.level),
+                                  ),
+                                ),
+                                title: Text(
+                                  event.message,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${event.time.toIso8601String().replaceFirst("T", " ")} · ${_appArea(event.area)}',
+                                ),
+                                childrenPadding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  2,
+                                  16,
+                                  10,
+                                ),
+                                children: [
+                                  _DiagnosticDetail(
+                                    icon: Icons.code,
+                                    title: '技术信息',
+                                    text: [
+                                      '事件码 ${event.code}',
+                                      if (event.correlationId.isNotEmpty)
+                                        '关联编号 ${event.correlationId}',
+                                      if (event.technical.isNotEmpty)
+                                        event.technical,
+                                    ].join(' · '),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    if (_view == 'records') ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+                        child: Row(
+                          children: [
+                            FilterChip(
+                              key: const ValueKey('attentionOnly'),
+                              selected: _attentionOnly,
+                              onSelected: (value) =>
+                                  setState(() => _attentionOnly = value),
+                              label: Text(
+                                _attentionOnly
+                                    ? '只看需处理 · ${visibleRecords.length}'
+                                    : '只看需处理',
+                              ),
+                              avatar: const Icon(Icons.priority_high, size: 17),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                '每张卡片代表一笔采集，技术细节可展开',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (_view == 'technical') ...[
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _LogFilterMenu(
+                                key: const ValueKey('sourceFilter'),
+                                icon: Icons.source_outlined,
+                                value: _wechatOnly ? 'wechat' : _source,
+                                options: const {
+                                  'all': '全部来源',
+                                  'app': '应用日志',
+                                  'notification': '通知',
+                                  'accessibility': '无障碍',
+                                  'wechat': '微信及后台',
+                                },
+                                onSelected: (value) => setState(() {
+                                  _wechatOnly = value == 'wechat';
+                                  _source = _wechatOnly ? 'all' : value;
+                                }),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _LogFilterMenu(
+                                key: const ValueKey('levelFilter'),
+                                icon: Icons.filter_alt_outlined,
+                                value: _level,
+                                options: const {
+                                  'all': '全部记录',
+                                  'error': '错误',
+                                  'warning': '警告',
+                                  'success': '成功',
+                                  'process': '处理中',
+                                },
+                                onSelected: (value) =>
+                                    setState(() => _level = value),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              key: const ValueKey('sortToggle'),
+                              tooltip: _sortAscending
+                                  ? '当前：时间正序 (最旧在前)，点击切为倒序'
+                                  : '当前：时间倒序 (最新在前)，点击切为正序',
+                              icon: Icon(
+                                _sortAscending
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_downward,
+                                size: 20,
+                              ),
+                              onPressed: () => setState(
+                                () => _sortAscending = !_sortAscending,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(16, 2, 16, 0),
+                        child: Row(
+                          children: [
+                            Icon(Icons.touch_app_outlined, size: 15),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '默认隐藏内部轮询；选择“处理中”可查看扫描与解析阶段',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                if (_view == 'records')
+                  visibleRecords.isEmpty
+                      ? SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
                             child: Text(
                               _attentionOnly ? '暂无需要处理的记录。' : '还没有可展示的自动记账记录。',
                             ),
-                          )
-                        : ListView.builder(
-                            itemCount: visibleRecords.length,
-                            itemBuilder: (_, index) => _PaymentRecordCard(
-                              record: visibleRecords[index],
-                            ),
                           ),
-                  ),
-                ],
-                if (_view == 'technical') ...[
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _LogFilterMenu(
-                            key: const ValueKey('sourceFilter'),
-                            icon: Icons.source_outlined,
-                            value: _wechatOnly ? 'wechat' : _source,
-                            options: const {
-                              'all': '全部来源',
-                              'app': '应用日志',
-                              'notification': '通知',
-                              'accessibility': '无障碍',
-                              'wechat': '微信及后台',
-                            },
-                            onSelected: (value) => setState(() {
-                              _wechatOnly = value == 'wechat';
-                              _source = _wechatOnly ? 'all' : value;
-                            }),
-                          ),
+                        )
+                      : SliverList.builder(
+                          itemCount: visibleRecords.length,
+                          itemBuilder: (_, index) =>
+                              _PaymentRecordCard(record: visibleRecords[index]),
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: _LogFilterMenu(
-                            key: const ValueKey('levelFilter'),
-                            icon: Icons.filter_alt_outlined,
-                            value: _level,
-                            options: const {
-                              'all': '全部记录',
-                              'error': '错误',
-                              'warning': '警告',
-                              'success': '成功',
-                              'process': '处理中',
-                            },
-                            onSelected: (value) =>
-                                setState(() => _level = value),
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          key: const ValueKey('sortToggle'),
-                          tooltip: _sortAscending
-                              ? '当前：时间正序 (最旧在前)，点击切为倒序'
-                              : '当前：时间倒序 (最新在前)，点击切为正序',
-                          icon: Icon(
-                            _sortAscending
-                                ? Icons.arrow_upward
-                                : Icons.arrow_downward,
-                            size: 20,
-                          ),
-                          onPressed: () =>
-                              setState(() => _sortAscending = !_sortAscending),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 2, 16, 0),
-                    child: Row(
-                      children: [
-                        Icon(Icons.touch_app_outlined, size: 15),
-                        SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '默认隐藏内部轮询；选择“处理中”可查看扫描与解析阶段',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: events.isEmpty
-                        ? Center(
+                if (_view == 'technical')
+                  events.isEmpty
+                      ? SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: Center(
                             child: Text(
                               report.enabled
                                   ? '当前筛选范围内暂无相关日志。'
                                   : '日志记录已关闭，可通过上方开关重新开启。',
                             ),
-                          )
-                        : ListView.builder(
-                            itemCount: events.length,
-                            itemBuilder: (_, i) {
-                              final event = events[i];
-                              final explanation = event.explanation;
-                              final quality = event.quality;
-                              final time = DateTime.fromMillisecondsSinceEpoch(
-                                event.time,
-                              ).toLocal();
-                              final color = _diagnosticColor(
-                                context,
-                                explanation.level,
-                              );
-                              final technical = [
-                                '事件码 ${event.code}',
-                                if (event.reference.isNotEmpty)
-                                  '追踪编号 ${event.reference}',
-                                if (event.count > 0) '计数 ${event.count}',
-                                if (event.repeats > 1)
-                                  '合并重复 ${event.repeats} 次',
-                              ].join(' · ');
-                              return Card(
-                                margin: const EdgeInsets.fromLTRB(12, 5, 12, 5),
-                                clipBehavior: Clip.antiAlias,
-                                child: ExpansionTile(
-                                  leading: quality != null
-                                      ? _QualityBadge(quality: quality)
-                                      : Icon(
-                                          _diagnosticIcon(explanation.level),
-                                          color: color,
-                                        ),
-                                  title: Text(
-                                    event.label,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                          ),
+                        )
+                      : SliverList.builder(
+                          itemCount: events.length,
+                          itemBuilder: (_, i) {
+                            final event = events[i];
+                            final explanation = event.explanation;
+                            final quality = event.quality;
+                            final time = DateTime.fromMillisecondsSinceEpoch(
+                              event.time,
+                            ).toLocal();
+                            final color = _diagnosticColor(
+                              context,
+                              explanation.level,
+                            );
+                            final technical = [
+                              '事件码 ${event.code}',
+                              if (event.reference.isNotEmpty)
+                                '追踪编号 ${event.reference}',
+                              if (event.count > 0) '计数 ${event.count}',
+                              if (event.repeats > 1) '合并重复 ${event.repeats} 次',
+                            ].join(' · ');
+                            return Card(
+                              margin: const EdgeInsets.fromLTRB(12, 5, 12, 5),
+                              clipBehavior: Clip.antiAlias,
+                              child: ExpansionTile(
+                                leading: quality != null
+                                    ? _QualityBadge(quality: quality)
+                                    : Icon(
+                                        _diagnosticIcon(explanation.level),
+                                        color: color,
+                                      ),
+                                title: Text(
+                                  event.label,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
                                   ),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      explanation.result,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (event.recognizedText.isNotEmpty) ...[
                                       const SizedBox(height: 3),
                                       Text(
-                                        explanation.result,
+                                        event.recognizedText,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                      ),
-                                      if (event.recognizedText.isNotEmpty) ...[
-                                        const SizedBox(height: 3),
-                                        Text(
-                                          event.recognizedText,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: Theme.of(
-                                            context,
-                                          ).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                      if (quality != null) ...[
-                                        const SizedBox(height: 5),
-                                        Wrap(
-                                          spacing: 5,
-                                          runSpacing: 4,
-                                          children: [
-                                            _QualityChip(
-                                              label: '${quality.score} 分',
-                                              ok: !quality.needsReview,
-                                            ),
-                                            if (quality.amountMatch != null)
-                                              _QualityChip(
-                                                label: '金额',
-                                                ok: quality.amountMatch!,
-                                              ),
-                                            if (quality.categoryMatch != null)
-                                              _QualityChip(
-                                                label: '分类',
-                                                ok: quality.categoryMatch!,
-                                              ),
-                                            if (quality.accountMatch != null)
-                                              _QualityChip(
-                                                label: '账户',
-                                                ok: quality.accountMatch!,
-                                              ),
-                                            if (quality.remarkSimilarity !=
-                                                null)
-                                              _QualityChip(
-                                                label:
-                                                    '备注 ${(quality.remarkSimilarity! * 100).round()}%',
-                                                ok:
-                                                    quality.remarkSimilarity! >=
-                                                    0.8,
-                                              ),
-                                          ],
-                                        ),
-                                      ],
-                                      const SizedBox(height: 3),
-                                      Text(
-                                        '${time.toIso8601String().replaceFirst("T", " ")} · ${event.origin}',
                                         style: Theme.of(
                                           context,
                                         ).textTheme.bodySmall,
                                       ),
                                     ],
-                                  ),
-                                  childrenPadding: const EdgeInsets.fromLTRB(
-                                    16,
-                                    2,
-                                    16,
-                                    10,
-                                  ),
-                                  children: [
-                                    const Divider(height: 14),
-                                    _DiagnosticDetail(
-                                      icon: Icons.fact_check_outlined,
-                                      title: '实际结果',
-                                      text: explanation.result,
-                                      color: color,
-                                    ),
-                                    if (quality != null)
-                                      _DiagnosticDetail(
-                                        icon: Icons.speed_outlined,
-                                        title: '识别质量对照',
-                                        text:
-                                            '${quality.score} 分 · ${quality.grade}'
-                                            '\n${quality.summary}',
-                                        color: quality.needsReview
-                                            ? Colors.orange.shade800
-                                            : Colors.green.shade700,
-                                      ),
-                                    if (explanation.action.isNotEmpty)
-                                      _DiagnosticDetail(
-                                        icon: Icons.lightbulb_outline,
-                                        title: '建议操作',
-                                        text: explanation.action,
-                                        color: Colors.orange.shade800,
-                                      ),
-                                    if (event.recognizedText.isNotEmpty)
-                                      _DiagnosticDetail(
-                                        icon: Icons.visibility_outlined,
-                                        title:
-                                            report.state['sensitiveLogging'] ==
-                                                true
-                                            ? '识别摘要（含敏感信息）'
-                                            : '脱敏识别摘要',
-                                        text: event.recognizedText,
-                                      ),
-                                    _DiagnosticDetail(
-                                      icon: Icons.code,
-                                      title: '技术信息',
-                                      text: technical,
-                                    ),
-                                    Align(
-                                      alignment: Alignment.centerRight,
-                                      child: TextButton.icon(
-                                        onPressed: () async {
-                                          await Clipboard.setData(
-                                            ClipboardData(
-                                              text: event.detailedText(),
+                                    if (quality != null) ...[
+                                      const SizedBox(height: 5),
+                                      Wrap(
+                                        spacing: 5,
+                                        runSpacing: 4,
+                                        children: [
+                                          _QualityChip(
+                                            label: '${quality.score} 分',
+                                            ok: !quality.needsReview,
+                                          ),
+                                          if (quality.amountMatch != null)
+                                            _QualityChip(
+                                              label: '金额',
+                                              ok: quality.amountMatch!,
                                             ),
-                                          );
-                                          if (context.mounted) {
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('已复制本条日志'),
-                                              ),
-                                            );
-                                          }
-                                        },
-                                        icon: const Icon(Icons.copy, size: 17),
-                                        label: const Text('复制本条'),
+                                          if (quality.categoryMatch != null)
+                                            _QualityChip(
+                                              label: '分类',
+                                              ok: quality.categoryMatch!,
+                                            ),
+                                          if (quality.accountMatch != null)
+                                            _QualityChip(
+                                              label: '账户',
+                                              ok: quality.accountMatch!,
+                                            ),
+                                          if (quality.remarkSimilarity != null)
+                                            _QualityChip(
+                                              label:
+                                                  '备注 ${(quality.remarkSimilarity! * 100).round()}%',
+                                              ok:
+                                                  quality.remarkSimilarity! >=
+                                                  0.8,
+                                            ),
+                                        ],
                                       ),
+                                    ],
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      '${time.toIso8601String().replaceFirst("T", " ")} · ${event.origin}',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
                                     ),
                                   ],
                                 ),
-                              );
-                            },
-                          ),
-                  ),
-                ],
+                                childrenPadding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  2,
+                                  16,
+                                  10,
+                                ),
+                                children: [
+                                  const Divider(height: 14),
+                                  _DiagnosticDetail(
+                                    icon: Icons.fact_check_outlined,
+                                    title: '实际结果',
+                                    text: explanation.result,
+                                    color: color,
+                                  ),
+                                  if (quality != null)
+                                    _DiagnosticDetail(
+                                      icon: Icons.speed_outlined,
+                                      title: '识别质量对照',
+                                      text:
+                                          '${quality.score} 分 · ${quality.grade}'
+                                          '\n${quality.summary}',
+                                      color: quality.needsReview
+                                          ? Colors.orange.shade800
+                                          : Colors.green.shade700,
+                                    ),
+                                  if (explanation.action.isNotEmpty)
+                                    _DiagnosticDetail(
+                                      icon: Icons.lightbulb_outline,
+                                      title: '建议操作',
+                                      text: explanation.action,
+                                      color: Colors.orange.shade800,
+                                    ),
+                                  if (event.recognizedText.isNotEmpty)
+                                    _DiagnosticDetail(
+                                      icon: Icons.visibility_outlined,
+                                      title:
+                                          report.state['sensitiveLogging'] ==
+                                              true
+                                          ? '识别摘要（含敏感信息）'
+                                          : '脱敏识别摘要',
+                                      text: event.recognizedText,
+                                    ),
+                                  if (event.detailText.isNotEmpty) ...[
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: SelectableText(event.detailText),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                  _DiagnosticDetail(
+                                    icon: Icons.code,
+                                    title: '技术信息',
+                                    text: technical,
+                                  ),
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: TextButton.icon(
+                                      onPressed: () async {
+                                        await Clipboard.setData(
+                                          ClipboardData(
+                                            text: event.detailedText(),
+                                          ),
+                                        );
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('已复制本条日志'),
+                                            ),
+                                          );
+                                        }
+                                      },
+                                      icon: const Icon(Icons.copy, size: 17),
+                                      label: const Text('复制本条'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
               ],
             ),
     );

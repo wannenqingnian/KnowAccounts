@@ -175,6 +175,16 @@ object PaymentCaptureGuard {
             amount?.let { put("amount", it) }
             merchant?.takeIf { it.isNotEmpty() }?.let { put("merchant", it) }
             account?.takeIf { it.isNotEmpty() }?.let { put("account", it) }
+            account?.let { put("paymentMethod", it) }
+            labeled("支付时间|付款时间|交易时间|转账时间|退款时间")?.let { put("paymentTime", it) }
+            (labeled("当前状态|交易状态|支付状态|付款状态")
+                ?: lines.firstOrNull { success.matches(it) })?.let { put("paymentStatus", it) }
+            labeled("交易单号|交易订单号|交易号|订单号")?.let { put("orderId", it) }
+            labeled("商户单号|商家单号|商户订单号")?.let { put("merchantOrderId", it) }
+            // Only retain payment-page text; callers exclude ordinary chat windows.
+            if (Regex("支付成功|付款成功|交易详情|账单详情|当前状态|商户全称|支付方式|付款方式|交易单号|退款详情").containsMatchIn(text)) {
+                put("paymentText", text)
+            }
         }
     }
     /**

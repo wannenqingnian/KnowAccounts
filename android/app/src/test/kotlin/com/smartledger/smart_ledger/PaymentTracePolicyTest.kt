@@ -2,6 +2,21 @@ package com.smartledger.smart_ledger
 import org.junit.Assert.*
 import org.junit.Test
 class PaymentTracePolicyTest {
+    @Test fun detailedPaymentFieldsRequireConsentAndAreScrubbedWhenDisabled() {
+        val input = "支付成功\n商户全称\n示例商店\n-3.00\n支付方式\n零钱\n支付时间\n2026年10月22日 08:23:03\n交易单号\n12345678901234567890\n商品\n早餐"
+        val read = PaymentCaptureGuard.diagnosticFields(input)
+        assertEquals(input, read["paymentText"])
+        assertEquals("零钱", read["paymentMethod"])
+        assertEquals("2026年10月22日 08:23:03", read["paymentTime"])
+        assertEquals("12345678901234567890", read["orderId"])
+        val saved = PaymentTracePolicy.fields(read + mapOf("parsedFields" to "{\"blocked\":false}", "warnings" to "账户未匹配"), true)
+        assertEquals(input, saved["paymentText"])
+        assertTrue(saved.containsKey("parsedFields"))
+        val disabled = PaymentTracePolicy.fields(saved, false)
+        for (key in listOf("paymentText", "paymentMethod", "paymentTime", "orderId", "parsedFields", "warnings")) assertFalse(disabled.containsKey(key))
+        assertFalse(PaymentCaptureGuard.diagnosticFields("今天聊天聊到早餐").containsKey("paymentText"))
+        assertTrue(PaymentTracePolicy.fields(mapOf("paymentText" to "x".repeat(20000)), true)["paymentText"]!!.endsWith("[内容过长，已截断]"))
+    }
     @Test fun onlyHashReferencesAndKnownSourcesAreAccepted() {
         assertEquals("a".repeat(12), PaymentTracePolicy.reference("auto-"+"a".repeat(64)))
         for(value in listOf("4111111111111111", "支付成功16.00元", "用户聊天", "a".repeat(12))) assertEquals("",PaymentTracePolicy.reference(value))

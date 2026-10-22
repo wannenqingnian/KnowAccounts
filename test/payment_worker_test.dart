@@ -48,11 +48,16 @@ void main() {
                 'source',
                 'id',
                 'count',
+                'fields',
               }),
               isEmpty,
             );
-            expect(metadata.toString(), isNot(contains('瑞幸咖啡')));
-            expect(metadata.toString(), isNot(contains('38.50')));
+            if (metadata['code'] == 'worker_details') {
+              // Native PaymentTrace applies the sensitive-log consent gate.
+              expect(metadata['fields']['parsedFields'], contains('瑞幸咖啡'));
+              expect(metadata['fields']['parsedFields'], contains('3850'));
+              expect(metadata['fields']['account'], isNotEmpty);
+            }
             throw StateError('logging unavailable');
           case 'takeConfirmation':
             return null;
